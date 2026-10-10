@@ -1,6 +1,6 @@
 只列 Go 的语言语义会直接产生的问题。每条都能指到具体代码位置，不需要判断口味。
 
-**状态**：**未过收敛检查**——`review` 的 `lang.md` 要求"至少 3 次独立推导取交集"才固化，本册没有做过那次检查，**覆盖不保证**。当检索线索用，每条的成立仍要按位置核实。来源：一份现成 Go 清单；工具链那一节按 `go vet` 的分析器全表核对过（原文 `pkg.go.dev/cmd/vet`，Go 1.27）。
+**状态**：候选池——**覆盖不保证**，当检索线索用，每条的成立仍要按位置核实。
 
 ## 先划界
 
@@ -9,7 +9,7 @@
 
 ## 先跑工具链，工具链报的不写进本件
 
-`go vet ./...` 默认跑全部检查；当前集合用 `go tool vet help` 查（本册按 Go 1.27 的分析器清单核对过）。与本册边界相关的是：`copylocks`（按值传含锁的类型）、`lostcancel`（`cancel` 没调）、`waitgroup`（`Add` 写在 `go func` 内部，与 `Wait` 形成竞态）、`loopclosure`、`errorsas`（传给 `errors.As` 的不是非 nil 指针或非 error）、`printf` / `slog`（格式串与结构化日志调用）、`unsafeptr`（`uintptr` 与 `unsafe.Pointer` 的非法转换）、`unusedresult`、`cgocall`（部分 cgo 指针传递规则）、`unreachable`、`structtag`、`stdversion`、`testinggoroutine`、`httpresponse`。注意 `unusedresult` 只覆盖它清单内的函数，不是"任何被丢弃的返回值"。
+`go vet ./...` 默认跑全部检查；当前集合用 `go tool vet help` 查。与本册边界相关的是这批（分析器名对照 Go 1.27）：`copylocks`（按值传含锁的类型）、`lostcancel`（`cancel` 没调）、`waitgroup`（`Add` 写在 `go func` 内部，与 `Wait` 形成竞态）、`loopclosure`、`errorsas`（传给 `errors.As` 的不是非 nil 指针或非 error）、`printf` / `slog`（格式串与结构化日志调用）、`unsafeptr`（`uintptr` 与 `unsafe.Pointer` 的非法转换）、`unusedresult`、`cgocall`（部分 cgo 指针传递规则）、`unreachable`、`structtag`、`stdversion`、`testinggoroutine`、`httpresponse`。注意 `unusedresult` 只覆盖它清单内的函数，不是"任何被丢弃的返回值"。
 
 `staticcheck ./...` 覆盖 `SA` / `S` / `ST` / `QF` 四族规则，与 vet 重叠的部分以它为准；它报的一律不写进本册。
 
