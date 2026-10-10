@@ -1,0 +1,11 @@
+# 本 bundle 只提供技能，不提供宿主代码：插入一个独立的 skill-filesystem 实例，
+# 只扫描本包自带的 skills/（includeDefaultRoots: false），因此不会干扰项目根、
+# 用户根或其它插件的技能来源。providerName 让这些技能在目录里可辨认来源。
+- insert:
+    - id: dsh-review-pack-skills
+      name: '@deepseek-ai/dsh-skill-filesystem'
+      config:
+        includeDefaultRoots: false
+        providerName: dsh-review-pack
+        customSkillDirs:
+          - !!js process.getBuiltinModule('node:path').join(process.getBuiltinModule('node:path').dirname(process.getBuiltinModule('node:module').createRequire(baseUrl).resolve('dsh-review-pack/package.json')), 'skills')
