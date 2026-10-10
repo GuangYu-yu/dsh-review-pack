@@ -2,11 +2,11 @@
 
 ## 先跑工具链，工具链报的不写进本件
 
-`cargo clippy --all-targets -- -D warnings`（前提是它真的跑过：CI 里没有这一步时，先自己跑一遍，或先把它接进 CI）覆盖这些：`ptr_arg` / `let_and_return`（`&String` 参数、尾表达式返回 let 绑定）、`single_match` / `redundant_pattern_matching`、`derivable_impls`、`await_holding_lock`、`filter_map`、`not_unsafe_ptr_arg_deref`（默认 deny）、`undocumented_unsafe_blocks`（需显式开启）。
+`cargo clippy --all-targets -- -D warnings`（前提是它真的跑过：CI 里没有这一步时，先自己跑一遍，或先把它接进 CI）覆盖这些：`ptr_arg` / `let_and_return`（`&String` 参数、尾表达式返回 let 绑定）、`single_match` / `redundant_pattern_matching`、`derivable_impls`、`await_holding_lock`、`manual_filter_map`、`not_unsafe_ptr_arg_deref`（默认 deny）、`undocumented_unsafe_blocks`（需显式开启）。
 
 rustc 自己就报的同样不列：未使用的生命周期参数（E0392）、迭代中修改集合（E0502）、非 `Send` 跨线程或跨 await、`unused_must_use`、公共 API 泄漏私有类型（`private_interfaces`）。
 
-语言无关的一律不在本件：失败路径见 `robustness.md`，结构与模块划分见 `architecture.md`，垃圾、冗余、重复，以及"用基本类型承载业务概念""布尔参数"两条，见 `code.md`。
+语言无关的一律不在本件：失败路径见 `../review/references/robustness.md`，结构与模块划分见 `../review/references/architecture.md`，垃圾、冗余、重复，以及"用基本类型承载业务概念""布尔参数"两条，见 `../review/references/code.md`。
 
 ## 所有权与借用
 

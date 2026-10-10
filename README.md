@@ -46,7 +46,7 @@ pnpm dsh plugin --profile <profile> add <本目录或 .tgz 路径>
 | `operability` / `docs-config` / `style` / `reasoning` | 运维面 / 文档与配置 / 方案取舍 / 已有结论 |
 | `derive` / `discipline` | 阶段件：评审开场 / 写改代码与交付前 |
 
-`lang-checklist/` 是各语言清单，一门语言一个文件（当前 Rust）。加一门语言只加一个文件，不需要改 `review`。
+`lang-checklist/` 是各语言清单，一门语言一个文件（当前 Rust）。加一门语言＝**放一个文件，并在 `review` 的分发表里加一行**——只放文件而不加行，新清单不会被分发到。
 
 ## 已知边界
 
