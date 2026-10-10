@@ -1,6 +1,6 @@
 {
   "name": "dsh-review-pack",
-  "version": "0.8.15",
+  "version": "0.8.16",
   "type": "module",
   "description": "评审技能：一个入口技能 + 15 个分册 + 一个语言清单技能。技能本体与宿主无关，可放进任意兼容 SKILL.md 的技能根。",
   "license": "MIT",

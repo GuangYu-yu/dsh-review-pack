@@ -150,7 +150,7 @@
 
 五处容易混的边界：
 
-- **只描述症状**（"拿锁之后 await 了一下""这里 clone 得有点多"）仍是语言语义 → 同级 `lang-checklist` 技能里的 `rust.md`；时序窗口与多段写入中间态 → `references/adversarial.md`。
+- **只描述症状**（"拿锁之后 await 了一下""这里 clone 得有点多"）仍是语言语义 → `references/rust.md`；时序窗口与多段写入中间态 → `references/adversarial.md`。
 - 把"会不会被搞坏"的**推理**写出来 → `references/adversarial.md`；把它变成**可执行的验证与判据** → `references/verification.md`。
 - 问"我是不是有什么没验证到"（准备宣称完成、要把关）→ `references/discipline.md`；问"该测什么、按什么判成功"（要一套验证方案）→ `references/verification.md`。
 - 只查"写的和实际是不是一回事" → `references/docs-config.md`；判断一个方案值不值得采用 → `references/style.md`。

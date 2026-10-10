@@ -14,20 +14,15 @@
 
 ## 装
 
-**任何兼容 `SKILL.md` 的宿主**：把 `skills/` 下的 **`review/` 与 `lang-checklist/` 两个目录一起**复制到技能根，并**保持同级**。
+**任何兼容 `SKILL.md` 的宿主**：把 `skills/review/` 复制到技能根就行。**本包只有一个技能**——语言清单是它 `references/` 下的普通文件，没有第二个目录要配套。
 
 ```
 <技能根>/
-├── review/            入口件 + 15 个分册
-│   ├── SKILL.md
-│   └── references/*.md
-└── lang-checklist/    各语言清单（一门语言一个文件）
-    ├── SKILL.md
-    ├── rust.md
-    └── go.md
+└── review/
+    ├── SKILL.md          入口件
+    └── references/       15 个分册 + 各语言清单（rust.md、go.md）
 ```
 
-**为什么必须同级**：`review` 的分发表里，语言类条目按"同级 `lang-checklist` 里 `<语言小写>.md`"解析——清单文件叫什么，由那一行末尾的"现成清单：Rust、Go"决定。只复制 `review/` 会让语言那一条**静默**指向不存在的位置（`references/` 下的 15 个分册都不受影响，所以这个坑不会自己暴露）。`lang-checklist` 标了 `disable-model-invocation`，不进模型目录、也不抢触发，复制它不增加常驻开销。
 
 **DSH**：可以直接按 bundle 安装本仓库或 Release 里的 `.tgz`。
 
@@ -47,7 +42,7 @@ pnpm dsh plugin --profile <profile> add <本目录或 .tgz 路径>
 | `operability` / `docs-config` / `style` / `reasoning` | 运维面 / 文档与配置 / 方案取舍 / 已有结论 |
 | `derive` / `discipline` | 阶段件：评审开场 / 写改代码与交付前 |
 
-`lang-checklist/` 是各语言清单，一门语言一个文件（当前 Rust、Go）。加一门语言＝**放一个文件，并在 `review` 的分发表里加一行**——只放文件而不加行，新清单不会被分发到；**这条现在有机器检查兜底**：`validate-skills.mjs` 会核对磁盘上的语言文件与分发表那句"现成清单："是否一一对应。
+`references/` 里除 15 个分册外，还有各语言清单（当前 `rust.md`、`go.md`）——一门一个文件，**文件名就是语言名**。加一门语言＝**放一个文件，并把语言名加进分发表那句"现成清单：…"**——只放文件而不加名字，新清单不会被分发到；**这条有机器检查兜底**：带「状态」行的文件必须登记，登记了的必须有文件、有状态。
 
 ## 已知边界
 
