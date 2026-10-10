@@ -1,5 +1,7 @@
 只列 Rust 的语言语义会直接产生的问题。每条都能指到具体代码位置，不需要判断口味。
 
+**状态**：**未过收敛检查**——`review` 的 `lang.md` 要求"至少 3 次独立推导取交集"才固化，本册没有做过那次检查，**覆盖不保证**。当检索线索用，每条的成立仍要按位置核实。来源：一份既有 Rust 清单，在发布过程中逐版补缺（例如后来补的「取消安全」）。
+
 ## 先跑工具链，工具链报的不写进本件
 
 `cargo clippy --all-targets -- -D warnings` 覆盖这些：`ptr_arg` / `let_and_return`（`&String` 参数、尾表达式返回 let 绑定）、`single_match` / `redundant_pattern_matching`、`derivable_impls`、`await_holding_lock`、`manual_filter_map`、`not_unsafe_ptr_arg_deref`（默认 deny）、`undocumented_unsafe_blocks`（需显式开启）。
