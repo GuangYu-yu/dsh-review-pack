@@ -8,7 +8,7 @@
 
 规则名以**你机器上那版** `dart analyze` 的 lint 集为准（lint 集会增删）。`dart format` 覆盖格式，`dart fix` 覆盖部分可自动修复项，空安全由编译器强制检查。
 
-**本册没有逐条实测过**——本机的 `dart` 启动后挂住无输出，探针跑不起来。所以下面每条都只是"从语言机制推出来的"，遇到可疑的先按位置核实。
+**本册每一条都在 Dart 3.12.2 上逐条跑过**（下文标实测结果）。
 
 ## 先划界
 
@@ -22,7 +22,7 @@
 ## 空值与类型提升
 
 - `!` 强制解包 null 抛 `TypeError`，运行期才暴露。不报：空值性已由上游非空类型或显式 `is` 检查证明
-- `late` 变量在赋值前读取抛 `LateInitializationError`；`late final` 二次赋值同样抛。不报：`late` 字段在构造函数初始化列表中必然已赋值
+- `late` **字段**在赋值前读取抛 `LateError`（消息里写明 `LateInitializationError`，3.12 实测）；`late final` 字段二次赋值同样抛。**局部变量上这不是运行期问题——编译器直接拒绝**（3.12 实测：`Late variable 'y' without initializer is definitely unassigned`）。不报：字段在构造函数初始化列表中必然已赋值
 - 类型提升（type promotion）对可变变量、非 final 字段不生效：`if (x != null) x.foo()` 在 `x` 是实例字段且未用局部变量缓存时**编译错**。Dart 3.2 起私有 final 字段可被提升。不报：`x` 是局部变量或 final 字段，或已改用局部变量缓存
 - 对 `dynamic` 的调用绕过静态类型检查，运行期才抛 `NoSuchMethodError`。不报：`dynamic` 处已用 `is`/`as` 收窄到具体类型
 - `as` 转换失败抛 `TypeError`，`is` 返回 `false` 而不抛错；两者混用是两套失败语义。不报：已用 `is` 收窄后再调用
@@ -44,14 +44,15 @@
 - 广播 `Stream` 在事件发出时无订阅者，事件被丢弃——不像单订阅流有缓冲。不报：订阅者在事件发出前已就绪，且已文档声明
 - `await for` 中 `break`/`return` 会取消订阅，从循环中逃出的异常同样取消。不报：有意在退出循环时取消订阅
 - `StreamSubscription.cancel()` 返回 `Future`，未等待时上游清理未完成，与后续逻辑竞态。不报：`cancel` 之后的逻辑不依赖上游已清理
-- 向已关闭的 `StreamController` `add` 抛 `StateError`。不报：`add` 前已检查 `isClosed`，或关闭路径已文档声明不再 `add`
+- 向已关闭的 `StreamController` `add` 抛 `StateError`（3.12 实测）。不报：`add` 前已检查 `isClosed`，或关闭路径已文档声明不再 `add`
+- **没有订阅者时 `await controller.close()` 永不完成**——`done` 要等到有监听者才完成，于是清理/启动代码就挂在那里（3.12 实测：300ms 仍未完成）。不报：`close()` 不 `await`，或关闭前已确保有订阅者（含 `.listen` 过再取消的情形）
 
 ## 集合与可变性
 
 - 迭代中修改集合（增删）抛 `ConcurrentModificationError`。不报：已先转为 `List` 快照再迭代，或迭代期间不修改集合
 - `List.filled(n, obj)` 用同一个 `obj` 引用填充 n 个位置，改一个影响所有。不报：`obj` 是不可变类型，或已改用 `List.generate`
 - `List`、`Map`、`Set` 都是引用类型：赋值、传参、`Map` 值共享同一对象。不报：已用 `List.from`、`Map.from` 等构造新集合
-- 固定长度 `List`（`List(n)` / `List.filled` 不带 `growable: true`）`add`/`remove` 抛 `UnsupportedError`。不报：集合已保证按索引写入，不做长度变更
+- 固定长度 `List`（`List.filled` 不带 `growable: true`）`add`/`remove` 抛 `UnsupportedError`（3.12 实测）。不报：集合已保证按索引写入，不做长度变更
 - `List.unmodifiable`、`Map.unmodifiable` 返回的视图在写入时抛 `UnsupportedError`，但**嵌套元素仍可变**。不报：嵌套元素全部不可变
 
 ## 类与继承
