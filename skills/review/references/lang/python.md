@@ -4,7 +4,7 @@
 
 ## 先跑工具链，工具链报的不写进本件
 
-`ruff` 覆盖（规则号**以你机器上那版的规则表为准**）：未使用导入与变量（F401/F841）、可变默认参数（B006）、函数调用作默认值（B008）、闭包捕获循环变量（B023）、`create_task` 未保存引用（RUF006）、裸 `except` 与 `except: pass`（E722/S110）、`== None`（E711）、`raise` 缺 `from`（B904）、`eval`/`exec`/`pickle`/`shell=True`（S 系列）、f-string 无占位符（F541）、`type(x) ==`（E721）、未定义名与重定义（F821/F811）。
+`ruff` 覆盖（规则号**以你机器上那版的规则表为准**）：未使用导入与变量（F401/F841）、可变默认参数（B006）、函数调用作默认值（B008）、闭包捕获循环变量（B023）、`create_task` 未保存引用（RUF006）、裸 `except` 与 `except: pass`（E722/S110）、`== None`（E711）、`raise` 缺 `from`（B904）、`eval`/`exec`/`pickle`/`shell=True`（S 系列）、f-string 无占位符（F541）、`type(x) ==`（E721）。
 
 `mypy` / `pyright` 覆盖：类型错误、`Optional` 成员访问、返回类型不匹配、协议与结构子类型检查。
 
@@ -18,8 +18,6 @@
 
 - 重试、超时、降级——`references/robustness.md`
 - 模块划分、包组织——`references/architecture.md`
-- 用字符串承载业务概念、布尔参数——`references/code.md`
-- 代价随规模放大（字符串拼接）——`references/performance.md`
 - 文本与编码的跨平台差异——`references/docs-config.md`
 
 ## 异常
@@ -52,9 +50,9 @@
 - `__eq__` 与 `__hash__` 不一致：相等的对象哈希不同，`dict` 查找失败、`set` 去重失效。不报：类不实现 `__eq__`，或两者均基于同一组不可变字段
 - 零参 `super()` 依赖 `__class__` cell，在类体外（如 `exec`、装饰器替换函数）调用行为异常。不报：`super()` 调用位于类体内的普通方法中
 - 多重继承下 `super().__init__()` 调用链由 MRO 决定，跳过某一基类的 `__init__` 时基类状态未初始化。不报：继承层次中只有一个基类实现 `__init__`，或已用 `super().__init__()` 链式传递
-- 描述符在实例访问与类访问上都会触发 `__get__`，参数不同（`__get__(instance, owner)` vs `__get__(None, owner)`）；数据描述符在类访问上也优先于实例字典，非数据描述符在实例访问时被实例字典遮蔽。不报：类未定义描述符，或访问方式与类型一致
+- 描述符在实例访问与类访问上都会触发 `__get__`，参数不同（`__get__(instance, owner)` vs `__get__(None, owner)`）；数据描述符在类访问上也优先于实例字典。不报：类未定义描述符，或访问方式与类型一致
 - `__init__` 中把值赋给类属性而非实例属性（未加 `self.`），实例读到时落在类上，实例间共享。不报：赋值目标是 `self.x`，或类属性本就是有意共享的常量
-- `__slots__` 的继承限制：子类未声明时实例重新获得 `__dict__`（收益消失）；基类未声明时子类的 `__slots__` 无效；多基类各自声明非空 `__slots__` 时多继承抛 `TypeError: multiple bases have instance lay-out conflict`（3.13 实测）。不报：层次中所有类均声明了且不涉及多继承
+- `__slots__` 的继承限制：子类未声明时实例重新获得 `__dict__`（收益消失）；基类未声明时子类的 `__slots__` 无效；多基类各自声明非空 `__slots__` 时多继承抛 `TypeError: multiple bases have instance lay-out conflict`（3.13 实测）。不报：层次中所有类均声明了
 
 ## 迭代与生成器
 
@@ -79,9 +77,9 @@
 - `is` 对小整数（`-5..256`）和部分短字符串走缓存，相同字面量在不同位置可能 `is` 为真或为假，行为随实现和版本变化（3.13 实测：小整数与拼接串真、`int('257') is int('257')` 假）。不报：比较的是 `None`、`True`、`False`、`NotImplemented` 等单例
 - `bool` 是 `int` 的子类，`True == 1`、`isinstance(True, int)` 为真，用 `isinstance(x, int)` 过滤时布尔值也被接收。不报：已显式排除 `bool`（`type(x) is int` 或 `not isinstance(x, bool)`）
 - `float('nan')` 与自身不相等、`nan in [nan]` 为假，`x != x` 是惯用法但要求读者知道 IEEE 754 的 NaN 不自等。不报：已用 `math.isnan(x)`
-- 大整数 `a / b` 返回 `float`，超 53 位尾数丢精度；应使用 `a // b` 或 `Fraction`/`Decimal`。不报：值域已证明在 float 精度内
+- 大整数 `a / b` 返回 `float`，超 53 位尾数丢精度；该用 `a // b` 或 `Fraction`。不报：值域已证明在 float 精度内
 - `round` 是银行家舍入（3.13 实测：0.5→0、1.5→2、2.5→2），与数学教材的"四舍五入"不同。不报：已使用 `Decimal.quantize` 或显式加 `0.5`
-- 从 JSON/环境变量/文件读入的"数字"常是 `str`：`'5' < 10` 抛 `TypeError`（3.13 实测），`'a' + b'a'` 同理。类型没在读取边界处转换，错误要到比较或拼接处才暴露。不报：类型已在边界处显式转换
+- 从 JSON/环境变量读入的"数字"常是 `str`：`'5' < 10` 抛 `TypeError`（3.13 实测），`'a' + b'a'` 同理。不报：类型已在读取边界处显式转换
 
 ## 资源与上下文
 
@@ -92,13 +90,13 @@
 
 ## 字符串与编码
 
-- `str.encode`/`bytes.decode` 未指定 `errors`，默认 `'strict'` 遇非法序列抛 `UnicodeDecodeError`；若期望丢弃或替换，须显式传 `errors=`。不报：输入已保证可解码，或接受 `strict` 抛错作为异常路径
+- `str.encode`/`bytes.decode` 未指定 `errors` 时默认 `'strict'`，遇非法序列抛 `UnicodeDecodeError`；要丢弃或替换须显式传 `errors=`。不报：输入已保证可解码，或接受抛错
 - 源码文件未声明编码，Python 3 默认 UTF-8，但含 BOM 时 `utf-8-sig` 与 `utf-8` 解码结果首字符不同。不报：文件不含 BOM，或读取时已显式选用 `utf-8-sig`
-- f-string 在 Python 3.12 前不支持反斜杠嵌套、同一引号嵌套，跨版本行为不同（3.13 实测已可用）。不报：表达式不含反斜杠且引号类型与外层不同
+- 注解只在静态检查里有形状：`TypedDict` 运行期就是个 dict——字段名拼错、类型不符、字段缺失全都不报（3.13 实测）；`@runtime_checkable` 的 `Protocol` 只检查**属性存在**、不检查签名（3.13 实测：签名完全不符也 `isinstance` 为真）；注解默认**延迟求值**，`__annotations__` 里是字符串，前向引用没定义时 `get_type_hints()` 抛 `NameError`。拿注解在运行期做校验、路由或序列化的代码会在这里断。不报：注解只给静态检查器看，运行期另做显式校验
 
 ## 导入与模块
 
-- 模块顶层代码有副作用（写文件、发请求、启动线程），`import` 即触发；测试、打包工具、类型检查器都会触发。不报：顶层代码只做定义和常量赋值，无 IO 与副作用
+- 模块顶层代码有副作用（写文件、发请求、启动线程），`import` 即触发——测试与打包工具都会执行到。不报：顶层代码只做定义和常量赋值
 - 循环导入：模块 A 顶层 `import B`，B 顶层 `import A`，导入顺序决定哪一方的名字未定义，表现为 `AttributeError` 或部分初始化的模块。不报：循环导入中的引用位于函数体内而非模块顶层
 - `from module import *` 污染导入方命名空间，且 `__all__` 未定义时导入所有非下划线名。不报：被导入模块已显式定义 `__all__`，且导入方在受控作用域内使用
 - `if __name__ == '__main__'` 缺失时，模块被 `import` 会执行主逻辑。不报：模块只被当作脚本运行，不做导入入口
