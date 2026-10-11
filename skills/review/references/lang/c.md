@@ -12,7 +12,11 @@
 
 `-fsanitize=thread`（TSan）覆盖跑到路径上的数据竞争。
 
-`clang-tidy` / `cppcheck` / MSVC `/analyze` 覆盖部分资源泄漏、宏误用、死代码。
+`clang-tidy` 是这一族里最接近"全量风格与陷阱检查器"的（别的语言里 clippy 的位置）——**但它默认几乎什么都不报，必须显式给 `-checks=`**：常用的是 `clang-analyzer-*`、`bugprone-*`、`cert-*`、`performance-*`（名单以你那版的规则集为准）。`cppcheck` / MSVC `/analyze` 覆盖部分资源泄漏、宏误用、死代码。
+
+`-Weverything`（clang）是把警告开到最全的现成档；`gcc -fanalyzer` 是编译器内置的一次静态分析（双重释放、use-after-free、泄漏、未初始化、空指针）。
+
+`-fsanitize=undefined` **不含**整数那一组：无符号回绕、隐式截断与符号转换要另加 `-fsanitize=integer,implicit-conversion`。未初始化读取在 MSan 跑不起来的平台上，可用 `-ftrivial-auto-var-init=pattern` 兜。
 
 前提是它真的跑过：CI 里没有这一步时，先自己跑一遍，或先把它接进 CI。
 
