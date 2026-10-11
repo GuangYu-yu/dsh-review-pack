@@ -19,6 +19,7 @@
 - 重试、超时、降级——`references/robustness.md`
 - 模块划分、包组织——`references/architecture.md`
 - 用字符串承载业务概念、布尔参数——`references/code.md`
+- 类型层的缺口（类型断言、`any` 的传播、`tsconfig` 开关）——`references/lang/typescript.md`（`.js` 经 JSDoc / `checkJs` 同样适用）
 
 ## 事件循环与异步
 
