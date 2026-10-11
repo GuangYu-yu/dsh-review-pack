@@ -29,7 +29,7 @@ metadata:
 | 补丁 / diff / PR / 变更集 | `references/diff.md` |
 | 一份实现（文件、模块）的质量 | `references/code.md` |
 | 结构与边界：模块划分、依赖方向 | `references/architecture.md` |
-| 某语言的语义：机制与陷阱 | `references/lang/<语言名全小写>.md`（如 Rust 是 rust.md、C++ 是 cpp.md；没有的走下一行） |
+| 某语言的语义：机制与陷阱 | `references/lang/<语言名全小写>.md`（如 Rust 是 rust.md、C++ 是 cpp.md；先按这个名字试读，读不到才走下一行） |
 | 为一门没有现成清单的语言现场推导清单 | `references/lang/method.md` |
 | 失败路径的设计：重试、超时、恢复、回滚 | `references/robustness.md` |
 | 性能：代价随规模放大、往返、争用 | `references/performance.md` |
