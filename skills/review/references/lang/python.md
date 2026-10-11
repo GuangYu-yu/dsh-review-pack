@@ -66,7 +66,7 @@
 - `asyncio.wait_for` / `asyncio.timeout` 超时取消协程，`CancelledError` 从 `await` 点抛出；协程内已获取的资源、已写入的一半状态由谁收拾。拿不出结论的，把每个协程的取消语义写成契约。不报：协程在 `await` 点上无未提交状态，或已用 `try/finally` 覆盖所有取消路径
 - `asyncio.shield` 保护的不是整个协程，只是屏蔽了外层取消；内层任务若自己收到取消仍然终止。不报：内层任务不响应 `CancelledError`，且已文档声明
 - `threading.Lock` 未用 `with`，异常路径上锁不释放，其他线程永久阻塞。不报：锁的获取与释放之间无异常路径，或已用 `with` 保证释放
-- `+=`、`check-then-act`、`dict.setdefault` 等在 GIL 下仍是复合操作，其他线程可在字节码之间插入。不报：操作对象只在单线程内可见，或已用锁保护
+- `+=`、`check-then-act`、`dict.setdefault` 在**带 GIL 的默认构建**下仍是复合操作，线程可在字节码之间插入（无 GIL 的构建不适用这条前提，但共享可变状态照样要同步）。不报：操作对象只在单线程内可见，或已用锁保护
 - `threading.Event.wait` 与 `Condition.wait` 的丢失唤醒：条件未在持锁状态下检查或通知。不报：等待与通知均在同一把锁下进行，且条件在循环中复检
 
 ## 类型与相等
@@ -80,7 +80,7 @@
 
 ## 资源与上下文
 
-- `open()` 不指定 `encoding`，使用 `locale.getpreferredencoding()`（3.13 实测：本机 cp936），Linux 通常 UTF-8、Windows 是 GBK/CP1252，跨平台读同一文件行为不同。不报：已显式传入 `encoding='utf-8'`
+- `open()` 不指定 `encoding` 时用 `locale.getpreferredencoding()`（3.13 实测：本机 cp936）——**默认编码仍随环境的版本**下，Linux 通常 UTF-8、Windows 是 GBK/CP1252，跨平台读同一文件行为不同。不报：已显式传入 `encoding='utf-8'`
 - `with` 的 `__exit__` 返回真值吞掉块内异常，调用方以为成功。不报：`__exit__` 返回 `False`/`None`，或吞异常是有意的
 - `__enter__` 抛异常时 `__exit__` 不被调用，已获取的部分资源无人释放。不报：`__enter__` 实现中不获取资源，或将资源获取放在 `__init__` 并由调用方负责清理
 - 依赖 GC 关闭文件/连接：CPython 引用计数会在变量超出作用域时立即关闭，但 PyPy 等实现可能延迟，跨解释器运行时资源泄漏。不报：已显式 `with`/`try/finally` 关闭，不依赖 GC
