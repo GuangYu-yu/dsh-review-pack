@@ -46,7 +46,7 @@
 
 - 变量为 `$null` 时访问索引抛 `Cannot index into a null array`；**空数组不抛**（`@()[0]` 返回 `$null`）——判空要看的是变量本身。不报：访问前已检查 `$null -ne $array`（或 `$array -and $array.Count -gt 0`）
 - 函数返回空数组 `@()` 时，管道自动解包为零个对象，调用方收到 `$null` 而非空数组。不报：使用 `Write-Output -NoEnumerate @()` 或调用方已文档声明可接受 `$null`
-- `$array += $item` 在循环中每次创建新数组，O(n²) 复杂度；大数组场景应使用 `[System.Collections.ArrayList]` 或 `List[T]`。不报：循环次数确定且小
+- `$array += $item` 在循环中每次创建新数组，O(n²) 复杂度；大数组场景应使用 `[System.Collections.ArrayList]` 或 `List[T]`。不报：循环上界来自脚本里的常量，且元素数在数百以内
 
 ## 类型与转换
 

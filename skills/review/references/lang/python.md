@@ -6,7 +6,7 @@
 
 `ruff` 覆盖（规则号**以你机器上那版的规则表为准**）：未使用导入与变量（F401/F841）、可变默认参数（B006）、函数调用作默认值（B008）、闭包捕获循环变量（B023）、`create_task` 未保存引用（RUF006）、裸 `except` 与 `except: pass`（E722/S110）、`== None`（E711）、`raise` 缺 `from`（B904）、`eval`/`exec`/`pickle`/`shell=True`（S 系列）、f-string 无占位符（F541）、`type(x) ==`（E721）。
 
-`mypy` / `pyright` 覆盖：类型错误、`Optional` 成员访问、返回类型不匹配、协议与结构子类型检查。
+`mypy` / `pyright` 覆盖：类型错误、`Optional` 成员访问、返回类型不匹配、协议子类型检查。
 
 **所以"默认参数是不是可变的""闭包有没有捕获循环变量""task 有没有保存引用"这几族不在本件**——ruff 报得最准：先让它喊。本件只收它到不了的。
 
@@ -74,7 +74,7 @@
 - `is` 对小整数（`-5..256`）和部分短字符串走缓存，相同字面量在不同位置可能 `is` 为真或为假，行为随实现和版本变化（3.13 实测：小整数与拼接串真、`int('257') is int('257')` 假）。不报：比较的是 `None`、`True`、`False`、`NotImplemented` 等单例
 - `bool` 是 `int` 的子类，`True == 1`、`isinstance(True, int)` 为真，用 `isinstance(x, int)` 过滤时布尔值也被接收。不报：已显式排除 `bool`（`type(x) is int` 或 `not isinstance(x, bool)`）
 - `float('nan')` 与自身不相等、`nan in [nan]` 为假，`x != x` 是惯用法但要求读者知道 IEEE 754 的 NaN 不自等。不报：已用 `math.isnan(x)`
-- 大整数 `a / b` 返回 `float`，超 53 位尾数丢精度；该用 `a // b` 或 `Fraction`。不报：值域已证明在 float 精度内
+- 大整数 `a / b` 返回 `float`，超 53 位尾数丢精度；该用 `a // b` 或 `Fraction`。不报：两侧都是源码常量，且结果不用于相等判断或金额
 - `round` 是银行家舍入（3.13 实测：0.5→0、1.5→2、2.5→2），与数学教材的"四舍五入"不同。不报：已使用 `Decimal.quantize` 或显式加 `0.5`
 - 从 JSON/环境变量读入的"数字"常是 `str`：`'5' < 10` 抛 `TypeError`（3.13 实测），`'a' + b'a'` 同理。不报：类型已在读取边界处显式转换
 

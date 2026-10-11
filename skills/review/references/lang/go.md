@@ -31,12 +31,12 @@
 
 ## 资源与 defer
 
-- `defer` 写在循环体内：句柄要到函数返回才释放，循环量一大就泄漏。不报：循环次数确定且小、函数体短
+- `defer` 写在循环体内：句柄要到函数返回才释放，循环量一大就泄漏。不报：循环上界来自源码里的常量（如 `for _, x := range fixedList`），且循环体里没有长生命周期资源
 - 打开的资源（`os.File`、`net.Conn`、`http.Response.Body`、`sql.Rows`）只在正常路径上关，错误路径漏关
 - `resp.Body.Close()` 之前没把 body 读完（`io.Copy(io.Discard, …)`），连接无法复用。不报：一次性连接，或明确不再复用
 - `time.Timer` / `time.Ticker` 不 `Stop()`，把回收留给 GC。不报：一次性 `Timer` 已触发，或 `Ticker` 随进程退出
 - 循环里用 `time.After`：每轮新建 timer，直到触发才回收，长循环会积累
-- `cancel` 在循环内 `defer`：每个都拖到函数返回才调，积累到退出。不报：循环次数确定且小——**但 `go vet` 的 `lostcancel` 只看"调没调"，不看"什么时候调"**，所以这条要自己判
+- `cancel` 在循环内 `defer`：每个都拖到函数返回才调，积累到退出。不报：循环上界来自源码里的常量，且退出前已显式调用（不靠 `defer`）——**但 `go vet` 的 `lostcancel` 只看"调没调"，不看"什么时候调"**，所以这条要自己判
 - 用 `runtime.SetFinalizer` 代替 `Close`，而不是当最后一道防线
 - `os.Exit` / `runtime.Goexit` 不执行 `defer`，依赖 defer 的清理不会发生。不报：退出前已显式清理
 - `defer` 改写具名返回值（`func f() (err error) { defer func() { err = … }() }`）：调用方看到的返回值被悄悄换掉
@@ -89,7 +89,7 @@
 - `len(s) == 0` 与 `s == nil` 混用：JSON 序列化出 `[]` 还是 `null` 由它决定
 - `nil` map 写入 panic
 - `for range` 里取 `&v` 并保存：1.22 之前所有指针指向同一地址；1.22 起每轮是新变量，但**有意共享**时仍要显式拷贝。版本以 `go.mod` 的 `go` 指令为准，别凭印象
-- 循环里用 `+=` 拼字符串，每次都重新分配。不报：循环次数确定且小
+- 循环里用 `+=` 拼字符串，每次都重新分配。不报：上界来自源码里的常量，且总长度有明确上界
 - `string` 与 `[]byte` 互转总是拷贝；`unsafe.String` / `unsafe.SliceData` 是零拷贝路径，用错会破坏字符串的不可变性
 - 迭代 map 时依赖顺序，或者把顺序写进测试
 
