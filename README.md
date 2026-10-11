@@ -1,6 +1,6 @@
 # dsh-review-pack
 
-一个"审一切待交付的东西"的评审技能包：**一个入口技能 + 16 个分册 + 语言清单那一组（`references/lang/`）**。
+一个"审一切待交付的东西"的评审技能包：**一个入口技能 + 18 个分册 + 语言清单那一组（`references/lang/`）**。
 
 技能本体与宿主无关——`skills/` 下就是普通的 `SKILL.md` 技能集，正文只用 `git` 与通用命令，不调用任何宿主专有工具或服务。任何能读 `SKILL.md` 的宿主都能装；`cordis.patch.yml` 只是给 DSH 的可选装配层，别的宿主忽略它即可。
 
@@ -20,7 +20,7 @@
 <技能根>/
 └── review/
     ├── SKILL.md          入口件
-    └── references/       16 个分册 + lang/（语言清单：method.md + 各语言一册）
+    └── references/       18 个分册 + lang/（语言清单：method.md + 各语言一册）
 ```
 
 
@@ -32,17 +32,18 @@ pnpm dsh plugin --profile <profile> add <本目录或 .tgz 路径>
 
 ## `skills/` 里有什么
 
-`review/SKILL.md` 是入口件：取输入 → 按对象分发 → 交付契约 → 报告格式。它每次评审都会加载，所以刻意写得很短；细节按需读 `review/references/` 下的 16 个分册（外加 `lang/method.md`）：
+`review/SKILL.md` 是入口件，只做两件事：**说清分册在哪**，以及**按对象把活分派出去**。它每次评审都会加载，所以刻意写得很薄；判定与交付的规则在 `review/references/contract.md`（**每次都读**），其余按需读 `review/references/` 下的 18 个分册（外加 `lang/method.md`）：
 
 | 分册 | 对象 |
 | --- | --- |
+| `contract` / `format` | 每次都读：结论怎么挂档位、怎么定级、怎么举证、报告要含什么 / 报告外形 |
 | `diff` / `code` / `architecture` | 补丁与变更集 / 一份实现 / 结构与边界 |
 | `lang` / `robustness` / `performance` / `security` | 语言写法推导 / 失败路径 / 性能 / 安全 |
 | `adversarial` / `verification` | 正确性对抗推理 / 验证本身 |
 | `operability` / `docs-config` / `style` / `reasoning` | 运维面 / 文档与配置 / 方案取舍 / 已有结论 |
-| `derive` / `discipline` | 阶段件：评审开场 / 写改代码与交付前 |
+| `derive` / `discipline` / `intake` | 阶段件：评审开场 / 写改代码与交付前 / 没有现成改动可审时怎么取输入 |
 
-`references/` 顶层是 16 个分册；**各语言清单住在 `references/lang/`**（当前 `rust.md`、`go.md`，`method.md` 讲怎么推一份新的——它本身也是一个分册）——**文件名就是语言名**，加一门语言只在那一个目录里加一个文件。加一门语言＝**放一个文件，并把语言名加进分发表那句"现成清单：…"**——只放文件而不加名字，新清单不会被分发到；**这条有机器检查兜底**：带「状态」行的文件必须登记，登记了的必须有文件、有状态。
+`references/` 顶层是 18 个分册；**各语言清单住在 `references/lang/`**（`method.md` 讲怎么推一份新的——它本身也是一个分册）。**文件名就是语言名的小写**（`C++` → `cpp.md`）：加一门语言**只在那一个目录里放一个文件**，入口与分发表一处都不用改。文件开头必须写「状态」行——那是它被认出来的唯一依据：`references/lang/` 下的文件要么带「状态」行，要么只能是那个方法件，**这条有机器检查兜底**。
 
 ## 已知边界
 
