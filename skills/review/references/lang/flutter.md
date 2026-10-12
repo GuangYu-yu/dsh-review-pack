@@ -107,6 +107,16 @@
 | 状态管理与数据流 | `ValueNotifier` 的所有权是否确实不在本 widget |
 | 通知与冒泡 | `onNotification` 的返回值是否就是设计意图 |
 
+## 官方契约的常咬点（不保证覆盖）
+
+框架**签名级契约**层面的咬人处——形态见 `references/lang/method.md` 的「官方契约那一层」。**出处是 Flutter API 文档页**（每条的原文取自对应方法的文档与实现代码）；**版本以你机器上那版 SDK 为准**（`flutter --version` 复查）。这里没写的当场查原文。
+
+- **`Scaffold.of(context)` 找不到祖先时，debug 下断言、release 下抛异常**（文档原文 "will cause an assert in debug mode, and throw an exception in release mode"；异常文本是 `Scaffold.of() called with a context that does not contain a Scaffold.`）——**同一个 `of`，debug 与 release 的失败形态不同**，测试里也许只是红屏、上线后是崩溃。要"没有就返回 null"得用 `maybeOf`。不报：该 `context` 确定在该 `Scaffold` 之下
+- **在同一个 `build` 里创建 `Scaffold` 又用它的 `context` 去找它，是取不到的**（文档原文：context 参数在"被返回的那个 widget **之上**"，所以找不到）——这是 `Scaffold.of` 断言最常见的原因。文档给了三条出路：`Builder` 取一个更靠下的 context、把 build 拆成内外两个 widget、或给 `Scaffold` 挂 `GlobalKey` 用 `key.currentState`。不报：`Scaffold` 与该 `context` 分属不同 widget
+- **`Theme.of(context)` 找不到祖先时返回 `ThemeData.fallback`，不抛错**（文档原文 "Defaults to `ThemeData.fallback` if there is no `Theme` in the given build context"）——**这与 `Scaffold.of` 的失败方式正好相反**：一处硬失败、一处静默降级。于是"忘了套 `MaterialApp`"在取主题时**不会报错**，只是整个界面用了一套与设计无关的默认色板与字号。不报：取到的值只用于非视觉逻辑
+- **`Theme.of` 会按最近的 `MaterialLocalizations` 返回本地化后的数据**（文档原文：若 context 被提供 `MaterialLocalizations` 的 `Localizations` 包着，"the returned data is localized according to the nearest available MaterialLocalizations"；实现里按 `scriptCategory` 走 `geometryThemeFor`）——**同一份 `ThemeData` 在不同语言下取到的排版几何不同**，跨语言截图比对会差在这里。不报：该处只取颜色，不取文字排版
+- **`Scaffold.of` 是"走元素树"的调用，文档明说它可能很贵**（原文 "This method can be expensive (it walks the element tree)"）——放在 `build` 里每帧调用、或在长列表的每个 item 里调用，代价随树深与 item 数放大。不报：调用点在树的浅层，且不在每帧路径上
+
 ## 报告
 
 本件只给清单，不含报告契约——**档位与报告形态以 `references/contract.md` 为准**。条目多且机械，**命中多不等于分量重**。
