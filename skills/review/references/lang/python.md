@@ -50,21 +50,21 @@
 - 多重继承下 `super().__init__()` 调用链由 MRO 决定，跳过某一基类的 `__init__` 时基类状态未初始化。不报：继承层次中只有一个基类实现 `__init__`，或已用 `super().__init__()` 链式传递
 - 描述符在实例访问与类访问上都会触发 `__get__`（类访问时 `instance` 是 `None`）；数据描述符在类访问上也优先于实例字典。不报：类未定义描述符，或访问方式与类型一致
 - `__init__` 中把值赋给类属性而非实例属性（未加 `self.`），实例读到时落在类上，实例间共享。不报：赋值目标是 `self.x`，或类属性本就是有意共享的常量
-- `__slots__` 的继承限制：子类未声明时实例重新获得 `__dict__`（收益消失）；基类未声明时子类的 `__slots__` 无效；多基类各自声明非空 `__slots__` 时多继承抛 `TypeError`（3.13 实测：`instance lay-out conflict`）。不报：层次中所有类均声明了
+- `__slots__` 的继承限制：子类未声明时实例重新获得 `__dict__`（收益消失）；基类未声明时子类的 `__slots__` 无效；多基类各自声明非空 `__slots__` 时多继承抛 `TypeError`（3.13 实测）。不报：层次中所有类均声明了
 
 ## 迭代与生成器
 
 - 一次性迭代对象（生成器、`__iter__` 返回 `self` 的迭代器）第二次遍历得到空序列。不报：调用方已文档声明单次消费，或返回的是 `list`/`tuple`
 - 生成器惰性求值，函数体内副作用（日志、写文件、网络请求）在消费点才发生，与定义点顺序无关。不报：生成器体内无副作用，或调用点即为消费点
-- 生成器被 `.close()` 时抛 `GeneratorExit`：裸 `except:` 吞掉后**若继续 `yield`**，`.close()` 抛 `RuntimeError: generator ignored GeneratorExit`；**只吞掉并从函数返回则不报**（3.13 实测）。不报：生成器中未捕获 `GeneratorExit`，或已显式 `raise` 放行
-- `zip` 在 Python 3 返回惰性迭代器，`for` 结束后无法复用（3.13 实测）；`dict.items()`/`dict.keys()` 是视图而非快照，迭代期间增删字典抛 `RuntimeError: dictionary changed size during iteration`。不报：迭代前已转为 `list`，或迭代期间不修改底层字典
+- 生成器被 `.close()` 时抛 `GeneratorExit`：裸 `except:` 吞掉后**若继续 `yield`**，`.close()` 抛 `RuntimeError: generator ignored GeneratorExit`（3.13 实测）；只吞掉并返回则无事。不报：生成器未捕获 `GeneratorExit`，或已显式 `raise` 放行
+- `zip` 返回惰性迭代器，`for` 结束后无法复用（3.13 实测）；`dict.items()`/`dict.keys()` 是视图而非快照，迭代期间增删字典抛 `RuntimeError: dictionary changed size during iteration`。不报：迭代前已转 `list`，或迭代期间不修改底层字典
 - `return` 在生成器中作为 `StopIteration.value` 传出（3.13 实测），被 `for` 循环吞掉，调用方拿不到返回值。不报：生成器内不使用 `return value`，或调用方显式用 `next` 捕获 `StopIteration`
 
 ## 并发与异步
 
 - `async def` 内调用阻塞 API（`time.sleep`、`requests.get`、`subprocess.run`、`open().read()`），阻塞整个事件循环，其他协程全部停摆。不报：已用 `asyncio.sleep`、`aiohttp`、`run_in_executor` 等异步替代
-- `asyncio.gather` 默认 `return_exceptions=False`：一个任务抛异常时**其余任务不会被取消**（3.13 实测：同伴照旧跑完），异常立刻抛给调用方——调用方以为都停了，后台还在跑。要取消兄弟任务得用 `TaskGroup`。不报：已设 `return_exceptions=True` 并逐项检查，或已改用 `TaskGroup`
-- `asyncio.wait_for` / `asyncio.timeout` 超时取消协程，`CancelledError` 从 `await` 点抛出；协程内已获取的资源、已写入的一半状态由谁收拾。拿不出结论的，把每个协程的取消语义写成契约。不报：协程在 `await` 点上无未提交状态，或已用 `try/finally` 覆盖所有取消路径
+- `asyncio.gather` 默认 `return_exceptions=False`：一个任务抛异常时**其余任务不会被取消**（3.13 实测：同伴照旧跑完）——调用方以为都停了，后台还在跑。要取消兄弟任务得用 `TaskGroup`。不报：已设 `return_exceptions=True` 并逐项检查，或已改用 `TaskGroup`
+- `asyncio.wait_for` / `asyncio.timeout` 超时取消协程，`CancelledError` 从 `await` 点抛出；协程内已获取的资源、已写入的一半状态由谁收拾。拿不出结论的，把每个协程的取消语义写成契约。不报：协程在 `await` 点上无未提交状态
 - `asyncio.shield` 保护的不是整个协程，只是屏蔽了外层取消；内层任务若自己收到取消仍然终止。不报：内层任务不响应 `CancelledError`，且已文档声明
 - `threading.Lock` 未用 `with`，异常路径上锁不释放，其他线程永久阻塞。不报：锁的获取与释放之间无异常路径，或已用 `with` 保证释放
 - `+=`、`check-then-act`、`dict.setdefault` 在**带 GIL 的默认构建**下仍是复合操作，线程可在字节码之间插入（无 GIL 的构建不适用这条前提，但共享可变状态照样要同步）。不报：操作对象只在单线程内可见，或已用锁保护
@@ -72,7 +72,7 @@
 
 ## 类型与相等
 
-- `is` 对小整数（`-5..256`）和部分短字符串走缓存，相同字面量在不同位置可能 `is` 为真或为假，行为随实现和版本变化（3.13 实测：小整数与拼接串真、`int('257') is int('257')` 假）。不报：比较的是 `None`、`True`、`False`、`NotImplemented` 等单例
+- `is` 对小整数（`-5..256`）和部分短字符串走缓存，相同字面量在不同位置可能 `is` 为真或为假（3.13 实测：小整数与拼接串为真、`int('257') is int('257')` 为假）。不报：比较的是 `None`、`True`、`False` 等单例
 - `bool` 是 `int` 的子类，`True == 1`、`isinstance(True, int)` 为真，用 `isinstance(x, int)` 过滤时布尔值也被接收。不报：已显式排除 `bool`（`type(x) is int` 或 `not isinstance(x, bool)`）
 - `float('nan')` 与自身不相等、`nan in [nan]` 为假，`x != x` 是惯用法但要求读者知道 IEEE 754 的 NaN 不自等。不报：已用 `math.isnan(x)`
 - 大整数 `a / b` 返回 `float`，超 53 位尾数丢精度；该用 `a // b` 或 `Fraction`。不报：两侧都是源码常量，且结果不用于相等判断或金额
@@ -81,7 +81,7 @@
 
 ## 资源与上下文
 
-- `open()` 不指定 `encoding` 时用 `locale.getpreferredencoding()`：**默认编码随环境变**（3.13.1 本机实测 `cp936`；Linux 通常 UTF-8、Windows 是 GBK/CP1252），跨平台读同一文件行为不同。不报：已显式传入 `encoding='utf-8'`
+- `open()` 不指定 `encoding` 时用 `locale.getpreferredencoding()`：**默认编码随环境变**（3.13.1 实测 `cp936`；Linux 通常 UTF-8、Windows 是 GBK/CP1252）。不报：已显式传入 `encoding='utf-8'`
 - `with` 的 `__exit__` 返回真值吞掉块内异常，调用方以为成功。不报：`__exit__` 返回 `False`/`None`，或吞异常是有意的
 - `__enter__` 抛异常时 `__exit__` 不被调用，已获取的部分资源无人释放。不报：`__enter__` 实现中不获取资源，或将资源获取放在 `__init__` 并由调用方负责清理
 - 依赖 GC 关闭文件/连接：CPython 引用计数会在变量超出作用域时立即关闭，但 PyPy 等实现可能延迟，跨解释器运行时资源泄漏。不报：已显式 `with`/`try/finally` 关闭，不依赖 GC
@@ -90,7 +90,7 @@
 
 - `str.encode`/`bytes.decode` 未指定 `errors` 时默认 `'strict'`，遇非法序列抛 `UnicodeDecodeError`；要丢弃或替换须显式传 `errors=`。不报：输入已保证可解码，或接受抛错
 - 源码文件未声明编码，Python 3 默认 UTF-8，但含 BOM 时 `utf-8-sig` 与 `utf-8` 解码结果首字符不同。不报：文件不含 BOM，或读取时已显式选用 `utf-8-sig`
-- 注解只在静态检查里有形状：`TypedDict` 运行期就是个 dict——字段名拼错、类型不符、字段缺失全都不报（3.13 实测）；`@runtime_checkable` 的 `Protocol` 只检查**属性存在**、不检查签名（3.13 实测：签名完全不符也 `isinstance` 为真）。**注解默认立即求值**（3.13.1 实测：前向引用未定义时 `def` 当场抛 `NameError`），`__annotations__` 存的是**注解对象本身**（实测是 `type`，不是 `str`）——**写成字符串或开 `from __future__ import annotations` 才是字符串**。拿注解在运行期做校验、路由或序列化的代码会在这里断。不报：注解只给静态检查器看，运行期另做显式校验
+- 注解只在静态检查里有形状：`TypedDict` 运行期就是个 dict——字段拼错、类型不符、字段缺失全不报；`@runtime_checkable` 的 `Protocol` 只查**属性存在**、不查签名（3.13 实测：签名完全不符也 `isinstance` 为真）。**注解默认立即求值**（3.13.1 实测：前向引用未定义时 `def` 当场抛 `NameError`），`__annotations__` 存的是**注解对象本身**（实测是 `type`，不是 `str`）——**写成字符串或开 `from __future__ import annotations` 才是字符串**。不报：注解只给静态检查器看
 
 ## 构建开关与校验
 
@@ -103,3 +103,16 @@
 - `from module import *` 污染导入方命名空间，且 `__all__` 未定义时导入所有非下划线名。不报：被导入模块已显式定义 `__all__`，且导入方在受控作用域内使用
 - `if __name__ == '__main__'` 缺失时，模块被 `import` 会执行主逻辑。不报：模块只被当作脚本运行，不做导入入口
 - 相对导入 `from . import x` 只在包内有效，脚本直接运行时 `__package__` 为空，抛 `ImportError`。不报：模块只通过包导入方式加载，不直接执行
+
+## 官方契约的常咬点（不保证覆盖）
+
+语言与标准库**契约**层面的咬人处——形态见 `references/lang/method.md` 的「官方契约那一层」。**每条都是 Python 3.13.1 本机实测**（`python -V` 复查）；这里没写的当场查原文。
+
+- **`str.split()` 不带参数与带 `' '` 是两回事**（实测：`'a  b '.split()` 得 `['a','b']`，而 `split(' ')` 得 `['a','','b','']`）——按分隔符解析却漏传参数，会多出空字段（CSV 式的定长解析尤其）。不报：输入已保证没有连续分隔符与首尾分隔符
+- **`json.dumps` 默认 `ensure_ascii=True`**（实测：`'中文'` 序列化成 `"\u4e2d\u6587"`）——要给人看或要做体积对比时，得显式 `ensure_ascii=False`。不报：输出只给机器读，或已接受转义
+- **`datetime.utcnow()` 返回的是 naive 时间**（实测 `tzinfo` 是 `None`；3.13.1 上它已带 `DeprecationWarning`，提示改用 `datetime.now(datetime.UTC)`）——naive 与 aware 相减抛 `TypeError`，本地时间和 UTC 也可能被当成同一串数字。不报：该值只在本进程内排序、不跨时区
+- **文本模式写文件会转换换行**（实测：Windows 上写 `'a\nb\n'`，文件里是 `b'a\r\nb\r\n'`；传 `newline=''` 才是 `b'a\nb\n'`）——按字节算长度、做校验和、与外部约定比对都会差。不报：文件只在本平台内读写，或已用二进制模式
+
+## 报告
+
+本件只给清单，不含报告契约——**档位与报告形态以 `references/contract.md` 为准**。本件条目多且机械，**命中多不等于分量重**。
