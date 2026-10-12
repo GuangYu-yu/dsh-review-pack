@@ -22,7 +22,7 @@
 
 `cppcheck` / MSVC `/analyze` 覆盖部分资源泄漏、模板实例化问题、死代码。
 
-前提是它真的跑过：CI 里没有这一步时，先自己跑一遍，或先把它接进 CI。
+前提是它真的跑过：CI 里没有这一步时，先自己跑一遍。
 
 ## 先划界
 
@@ -118,3 +118,17 @@
 - 线程未 join 或 detach 后仍访问其栈上数据——UB，不是流程问题。不报：`join()`/`detach()` 在源码里显式可见，且被访问的数据不在该线程栈上
 - `memory_order_consume` 的依赖关系被误用：编译器可将其提升为 `acquire` 或降级为 `relaxed`，语义不可靠。不报：已替换为 `acquire`
 - 两个 `atomic` 之间用 `relaxed` 建立同步：只保证原子性，不保证可见性顺序。不报：已文档声明仅需原子性
+
+## 官方契约的常咬点（不保证覆盖）
+
+容器与标准库**规范定死的契约**——形态见 `references/lang/method.md` 的「官方契约那一层」。**出处是 cppreference 的 `std::vector` 页**，其中有一张 **Iterator invalidation 表**，本节逐条引它；**标准版本以你机器上那版为准**（`static_assert(__cplusplus)` 就是复查命令）。这里没写的当场查原文。
+
+- **`push_back` / `emplace_back` 失效多少，取决于"容量变没变"**（表原文："If the vector changed capacity, all of them. If not, only `end()`"）——所以"我没改容器大小"不是安全的理由：**容量一变，此前拿到的一切迭代器全废**，而它可能正好发生在一百万次插入里的某一次。不报：迭代器在容器未再被修改的作用域内使用完
+- **`insert` / `emplace` 在容量未变时只失效"插入点及其后（含 `end()`）"**（表原文）——**插入点之前的一直有效**。"insert 之后什么都不能用"和"只有后半段不能用"都不对，两种结果由容量决定。不报：插入后不再使用插入点及其后的迭代器
+- **`erase` 失效"被删元素及其后全部（含 `end()`）"**（表原文）——删除循环里"删完接着用后面的迭代器"就是这一类；即便容器没有重新分配也一样。不报：删除后只使用被删位置之前的迭代器，或改用返回的新迭代器
+- **`operator[]` 不做边界检查**（页面对照：`at` 是 "access specified element **with bounds checking**"，`operator[]` 只是 "access specified element"）；另**`clear` / `operator=` / `assign` 一律失效**（表原文 "Always."），而 **`clear()` 不释放容量**（表原文之外，页面写明"Extra memory can be returned to the system via a call to `shrink_to_fit()`"）。不报：下标已受约束，且清空后不再持有旧迭代器
+- **`vector<bool>` 是一个特化，不是 `vector<T>` 那套保证**（页面原文："the standard library provides a specialization of `std::vector` for the type `bool`, which may be optimized for space efficiency"）——**它的元素访问返回什么、能不能取地址，要与 `vector<T>` 分开判**；把 `vector<bool>` 当普通容器用（取元素地址、按 `bool&` 传参）是这一处最常见的错。不报：该处只按下标读取布尔值
+
+## 报告
+
+本件只给清单，不含报告契约——**档位与报告形态以 `references/contract.md` 为准**。本件条目多且机械，**命中多不等于分量重**。
