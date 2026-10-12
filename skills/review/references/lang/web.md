@@ -81,6 +81,15 @@
 
 其他领域（内容产品、电商、游戏、社交、财务）的对应条目按这四类归位；**归不进去的，算本册未覆盖**——四类不是穷尽。
 
+## 官方契约的常咬点（不保证覆盖）
+
+轴不止"定义点唯一性"——**平台规范定死的初始值与适用对象**也是同一类咬人处（形态见 `references/lang/method.md` 的「官方契约那一层」）。**每条都引规范原文**（MDN 的 CSS 参考，每页都带 Formal definition 表；`Format` 与规范版本见该页）。这里没写的当场查原文。
+
+- **`box-sizing` 的初始值是 `content-box`**（"the initial and default value as specified by the CSS standard"，此时 `width` 只含内容，不含 padding 与 border）——**但 UA 样式表对 `table`、`select`、`button`，以及 type 为 radio / checkbox / reset / button / submit / color / search 的 `input` 用的是 `border-box`**。于是**同一个页面里两类元素的"宽度"含义不同**：给它们设一样的 `width` 并不一样宽。不报：全局已统一 `box-sizing`
+- **百分比 `padding` 与 `margin` 都相对包含块的 `width`**（规范原文 "refer to the width of the containing block"）——**上下方向也不例外**，不相对高度。让一个按高度比例留白的块，或让同一行内几个盒子的上下留白随容器宽度变，都会得到意料外的值。不报：该处的百分比在同一容器宽度下取值，且已按此验证
+- **`min-width: auto` 是个会变形的值**（初始值 `auto`）：规范原文说它对**块盒、行内块与表格布局盒解析为 `0`**，而对 **flex item 与 grid item** 用的是建议尺寸或 **min-content**——**同一个 `auto`，两种 display 下是两个不同的下限**。这正是"flex 里那一条内容撑破容器、怎么设 `width` 都不缩"的机制。不报：该元素不是 flex/grid item，或已显式写明 `min-width: 0`
+- **`z-index` 只作用于定位元素**（规范原文 "Applies to: positioned elements"，且开头写明是"任意 position 不是 static 的盒"）——写在 `position: static` 的元素上**完全不生效**，而不是"取值被忽略但仍在比较"。层级表里分了值、元素却没定位，是最常见的整表失效。不报：该元素或其定位上下文已由层级表统一管理
+
 ## 报告
 
 本件只给清单，不含报告契约——**档位与报告形态以 `references/contract.md` 为准**。本件条目多且机械，所以**不要因为命中条数多就抬高结论分量**。
