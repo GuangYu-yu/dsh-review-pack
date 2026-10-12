@@ -79,3 +79,15 @@ rustc 自己就报的同样不列：未使用的生命周期参数（E0392）、
 - 同一个 crate 特性的条件编译判断在多个模块里各写了一遍，两份逻辑会漂移。不报：两处判断的是**不同**的特性
 - 公共 API 里用类型别名暴露了第三方 crate 的具体类型，等于把依赖固化进了接口
 - 依赖声明了但代码里没有引用它的任何项（rustc 不报这个，得靠 `cargo-udeps` / `cargo machete`）：白白拖长构建，也扩大了供应链面。不报：它是 build/dev 依赖，或只被 feature 门后的代码用到
+
+## 已知盲区：三问与三道交叉检查在这门语言上会漏掉的面
+
+**这张表是本册自己的，不是方法件的**——它是三次推导一致指出、三问与交叉检查都到不了的那批（口径见 `references/lang/method.md`）。推导完先拿它对一遍，比再补一轮条目更省。**每个栈各自推自己那张。**
+
+- **异步与地址稳定性**：`Future` 的 `Send`、`!Unpin` 与 `Pin` 的自引用前提、`select!`/`timeout` 的取消安全
+- **并发原语**：原子内存序（`Relaxed` vs `Acquire`/`Release`）、`OnceLock`/`LazyLock`、无界 channel、锁序、持锁做 I/O
+- **数值与域语义**：溢出（debug panic / release 回绕）、`as` 的截断与符号、浮点 NaN 与比较
+- **panic 与析构**：`panic = abort` 与 unwind 的差异、`Drop` 里 panic、`catch_unwind` 之后继续使用
+- **布局与 ABI**：`repr(Rust)` 无布局保证、niche、字段顺序、`repr(packed)`
+- **构建与供给链**：`build.rs` 与过程宏在编译期执行、锁文件漂移、feature 组合
+- **分配与常量求值**：分配器不匹配、OOM、`const` 求值中的 UB
