@@ -55,7 +55,7 @@
 - `__proto__` 或 `constructor.prototype` 被写入时，`Object.prototype` 被污染，所有对象继承被注入的属性。不报：使用 `Object.create(null)` 或 `Map`/`Set` 替代普通对象，或已用 `--disable-proto=delete`
 - 递归合并用户输入时未过滤 `__proto__`、`constructor`、`prototype` 键，构成原型污染。不报：合并前已显式拒绝这三个键，或使用结构化克隆
 - `this` 绑定随调用点变化：普通函数调用指向全局对象（严格模式为 `undefined`），方法调用指向接收者，`call`/`apply`/`bind` 显式指定，箭头函数捕获外层 `this`。不报：所有函数调用点均已在同一对象上调用，或使用箭头函数锁定 `this`
-- `[Node]` 全局 `this` 指向 `global`，`[Browser]` 指向 `window`。不报：代码不依赖全局 `this`
+- `[Node]` 模块顶层的 `this`：**CJS 是 `module.exports`，ESM 恒为 `undefined`**——只有 REPL 里才是 `global`。把 REPL 的行为当成模块行为，是这一条最常被写错的地方。`[Browser]` 顶层是 `window`，模块脚本里是 `undefined`。不报：代码不依赖顶层 `this`
 - `Object.freeze()` 是浅冻结，嵌套对象仍可变；冻结后写入静默失败（非严格模式）或抛错（严格模式）。不报：嵌套对象已单独冻结
 - `var` 提升，且 `var` 在循环里是**同一个绑定**：循环里建的闭包全读到终值（Node 实测 `[3, 3, 3]`），而 `let` 每次迭代一个新绑定（实测 `[0, 1, 2]`）。不报：已统一用 `let`/`const`
 
@@ -72,7 +72,7 @@
 
 ## 错误处理
 
-- `catch (e)` 在非严格模式下可省略绑定（`catch {}`），在严格模式下未捕获绑定是语法错误；跨模块边界时行为不一致。不报：已统一使用 `catch (e)` 显式绑定
+- `catch {}` 省略绑定由语法直接允许（ES2019），**任何模式下都合法**——所以这里要判的不是"模式"，是**这个异常对象该不该丢**：丢了就不能记日志、不能按类型分支。不报：该处确实只需知道"失败了"，且没有可恢复分支
 - `throw` 可抛出任意值（字符串、数字、对象），`catch` 中按类型判断时假设是 `Error` 会失败。不报：抛出点保证只抛 `Error` 子类
 - 异步函数中 `try/catch` 只捕获同步代码和 `await` 的异常，未 `await` 的 promise 异常逃逸。不报：所有 promise 都已 `await` 或 `.catch`
 

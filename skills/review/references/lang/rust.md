@@ -4,7 +4,7 @@
 
 ## 先跑工具链，工具链报的不写进本件
 
-`cargo clippy --all-targets -- -D warnings` 覆盖这些：`ptr_arg` / `let_and_return`（`&String` 参数、尾表达式返回 let 绑定）、`single_match` / `redundant_pattern_matching`、`derivable_impls`、`await_holding_lock`、`manual_filter_map`、`not_unsafe_ptr_arg_deref`（默认 deny）、`undocumented_unsafe_blocks`（需显式开启）。
+`cargo clippy --all-targets -- -D warnings` 覆盖这些（**组别与默认级别以你机器上那版为准**——`clippy-driver -W help` 会把它那份列出来）：`ptr_arg` / `let_and_return`（`&String` 参数、尾表达式返回 let 绑定）、`single_match` / `redundant_pattern_matching`、`derivable_impls`、`await_holding_lock`、`manual_filter_map`、`not_unsafe_ptr_arg_deref`（默认 deny）、`undocumented_unsafe_blocks`（需显式开启）。
 
 rustc 自己就报的同样不列：未使用的生命周期参数（E0392）、迭代中修改集合（E0502）、非 `Send` 跨线程或跨 await、`unused_must_use`、公共 API 泄漏私有类型（`private_interfaces`）。
 

@@ -10,7 +10,7 @@
 
 **所以"默认参数是不是可变的""闭包有没有捕获循环变量""task 有没有保存引用"这几族不在本件**——ruff 报得最准：先让它喊。本件只收它到不了的。
 
-前提是它真的跑过：CI 里没有这一步时，先自己跑一遍，或先把它接进 CI。
+前提是它真的跑过：CI 里没有这一步时，先自己跑一遍。
 
 ## 先划界
 
@@ -35,28 +35,29 @@
 - 类属性是可变对象（`list`/`dict`/`set`），所有实例共享同一份；一个实例的 `append` 影响其他实例（3.13 实测：`a.items is b.items`）。不报：类属性是不可变类型，或已在 `__init__` 中显式拷贝
 - 函数参数按对象引用传递，函数内修改入参的可变内容影响调用方；想隔离须显式拷贝。不报：函数已文档声明会原地修改，或入参不可变
 - `dict.copy()`、切片、`copy.copy()` 都是浅拷贝，嵌套可变对象仍共享。不报：嵌套对象不可变，或已用 `copy.deepcopy`
-- 含**不可哈希**元素的 `tuple` 连 hash 都过不去（3.13 实测：`unhashable type`）；含**可变但可哈希**对象（自定义类按可变字段算 `__hash__`）的 `tuple` 作键后，元素一改哈希就变，键再也找不到。不报：元组内元素全部不可变
+- 含**不可哈希**元素的 `tuple` 仍不可哈希（3.13 实测：`unhashable type`）；含**可变但可哈希**对象（自定义类按可变字段算 `__hash__`）的 `tuple` 作键后，元素一改哈希就变，键再也找不到。不报：元组内元素全部不可变
 
 ## 作用域与闭包
 
 - 内部函数对同名变量赋值而不声明 `nonlocal`，创建新局部变量，外部不受影响，调用方以为已更新。不报：内部只读该变量，或已显式 `nonlocal` 声明
 - 函数里的 `global x; x = ...` 改的是模块全局，多个函数互相覆盖。不报：全局名字只在一处被写入，或已改用模块级状态对象
+
 ## 类与继承
 
 - 定义了 `__eq__` 但未定义 `__hash__`，Python 3 自动将 `__hash__` 置 `None`，实例放入 `set`/`dict` 时抛 `TypeError`（3.13 实测：`unhashable type`）。不报：类明确设计为不可哈希且已文档声明
 - `__eq__` 与 `__hash__` 不一致：相等的对象哈希不同，`dict` 查找失败、`set` 去重失效。不报：类不实现 `__eq__`，或两者均基于同一组不可变字段
 - 零参 `super()` 依赖 `__class__` cell，在类体外（如 `exec`、装饰器替换函数）调用行为异常。不报：`super()` 调用位于类体内的普通方法中
 - 多重继承下 `super().__init__()` 调用链由 MRO 决定，跳过某一基类的 `__init__` 时基类状态未初始化。不报：继承层次中只有一个基类实现 `__init__`，或已用 `super().__init__()` 链式传递
-- 描述符在实例访问与类访问上都会触发 `__get__`，参数不同（`__get__(instance, owner)` vs `__get__(None, owner)`）；数据描述符在类访问上也优先于实例字典。不报：类未定义描述符，或访问方式与类型一致
+- 描述符在实例访问与类访问上都会触发 `__get__`（类访问时 `instance` 是 `None`）；数据描述符在类访问上也优先于实例字典。不报：类未定义描述符，或访问方式与类型一致
 - `__init__` 中把值赋给类属性而非实例属性（未加 `self.`），实例读到时落在类上，实例间共享。不报：赋值目标是 `self.x`，或类属性本就是有意共享的常量
-- `__slots__` 的继承限制：子类未声明时实例重新获得 `__dict__`（收益消失）；基类未声明时子类的 `__slots__` 无效；多基类各自声明非空 `__slots__` 时多继承抛 `TypeError: multiple bases have instance lay-out conflict`（3.13 实测）。不报：层次中所有类均声明了
+- `__slots__` 的继承限制：子类未声明时实例重新获得 `__dict__`（收益消失）；基类未声明时子类的 `__slots__` 无效；多基类各自声明非空 `__slots__` 时多继承抛 `TypeError`（3.13 实测：`instance lay-out conflict`）。不报：层次中所有类均声明了
 
 ## 迭代与生成器
 
 - 一次性迭代对象（生成器、`__iter__` 返回 `self` 的迭代器）第二次遍历得到空序列。不报：调用方已文档声明单次消费，或返回的是 `list`/`tuple`
 - 生成器惰性求值，函数体内副作用（日志、写文件、网络请求）在消费点才发生，与定义点顺序无关。不报：生成器体内无副作用，或调用点即为消费点
 - 生成器被 `.close()` 时抛 `GeneratorExit`：裸 `except:` 吞掉后**若继续 `yield`**，`.close()` 抛 `RuntimeError: generator ignored GeneratorExit`；**只吞掉并从函数返回则不报**（3.13 实测）。不报：生成器中未捕获 `GeneratorExit`，或已显式 `raise` 放行
-- `zip` 在 Python 3 返回惰性迭代器，`for` 结束后无法复用（3.13 实测：第二次 `list(z)` 为空）；`dict.items()`/`dict.keys()` 是视图而非快照，迭代期间增删字典抛 `RuntimeError: dictionary changed size during iteration`。不报：迭代前已转为 `list`，或迭代期间不修改底层字典
+- `zip` 在 Python 3 返回惰性迭代器，`for` 结束后无法复用（3.13 实测）；`dict.items()`/`dict.keys()` 是视图而非快照，迭代期间增删字典抛 `RuntimeError: dictionary changed size during iteration`。不报：迭代前已转为 `list`，或迭代期间不修改底层字典
 - `return` 在生成器中作为 `StopIteration.value` 传出（3.13 实测），被 `for` 循环吞掉，调用方拿不到返回值。不报：生成器内不使用 `return value`，或调用方显式用 `next` 捕获 `StopIteration`
 
 ## 并发与异步
@@ -80,7 +81,7 @@
 
 ## 资源与上下文
 
-- `open()` 不指定 `encoding` 时用 `locale.getpreferredencoding()`（3.13 实测：本机 cp936）——**默认编码仍随环境的版本**下，Linux 通常 UTF-8、Windows 是 GBK/CP1252，跨平台读同一文件行为不同。不报：已显式传入 `encoding='utf-8'`
+- `open()` 不指定 `encoding` 时用 `locale.getpreferredencoding()`：**默认编码随环境变**（3.13.1 本机实测 `cp936`；Linux 通常 UTF-8、Windows 是 GBK/CP1252），跨平台读同一文件行为不同。不报：已显式传入 `encoding='utf-8'`
 - `with` 的 `__exit__` 返回真值吞掉块内异常，调用方以为成功。不报：`__exit__` 返回 `False`/`None`，或吞异常是有意的
 - `__enter__` 抛异常时 `__exit__` 不被调用，已获取的部分资源无人释放。不报：`__enter__` 实现中不获取资源，或将资源获取放在 `__init__` 并由调用方负责清理
 - 依赖 GC 关闭文件/连接：CPython 引用计数会在变量超出作用域时立即关闭，但 PyPy 等实现可能延迟，跨解释器运行时资源泄漏。不报：已显式 `with`/`try/finally` 关闭，不依赖 GC
@@ -89,7 +90,7 @@
 
 - `str.encode`/`bytes.decode` 未指定 `errors` 时默认 `'strict'`，遇非法序列抛 `UnicodeDecodeError`；要丢弃或替换须显式传 `errors=`。不报：输入已保证可解码，或接受抛错
 - 源码文件未声明编码，Python 3 默认 UTF-8，但含 BOM 时 `utf-8-sig` 与 `utf-8` 解码结果首字符不同。不报：文件不含 BOM，或读取时已显式选用 `utf-8-sig`
-- 注解只在静态检查里有形状：`TypedDict` 运行期就是个 dict——字段名拼错、类型不符、字段缺失全都不报（3.13 实测）；`@runtime_checkable` 的 `Protocol` 只检查**属性存在**、不检查签名（3.13 实测：签名完全不符也 `isinstance` 为真）；注解默认**延迟求值**，`__annotations__` 里是字符串，前向引用没定义时 `get_type_hints()` 抛 `NameError`。拿注解在运行期做校验、路由或序列化的代码会在这里断。不报：注解只给静态检查器看，运行期另做显式校验
+- 注解只在静态检查里有形状：`TypedDict` 运行期就是个 dict——字段名拼错、类型不符、字段缺失全都不报（3.13 实测）；`@runtime_checkable` 的 `Protocol` 只检查**属性存在**、不检查签名（3.13 实测：签名完全不符也 `isinstance` 为真）。**注解默认立即求值**（3.13.1 实测：前向引用未定义时 `def` 当场抛 `NameError`），`__annotations__` 存的是**注解对象本身**（实测是 `type`，不是 `str`）——**写成字符串或开 `from __future__ import annotations` 才是字符串**。拿注解在运行期做校验、路由或序列化的代码会在这里断。不报：注解只给静态检查器看，运行期另做显式校验
 
 ## 构建开关与校验
 
