@@ -8,9 +8,9 @@
 
 `eslint` 配合 `@typescript-eslint` 覆盖：`no-explicit-any`、`no-non-null-assertion`、`no-unnecessary-type-assertion`、`consistent-type-imports`、`no-floating-promises`、`await-thenable`、`no-unnecessary-condition`。
 
-前提是它真的跑过：CI 里没有这一步时，先自己跑一遍，或先把它接进 CI。
+前提是它真的跑过：CI 里没有这一步时，先自己跑一遍。
 
-**本册没有逐条实测过**——本机没有 TypeScript 编译器（四个常见位置与 `D:\Software` 递归都找过）。所以下面每条都只是"从类型层与运行时的缺口推出来的"，遇到可疑的先按位置核实。开关名与默认值以**你机器上那版** `tsc --help` / 官方发布说明为准。
+**本册的机制条目是从类型层与运行时的缺口推出来的，未逐条核实**——遇到可疑的先按位置核实。**「官方契约的常咬点」那一节是 tsc 7.0.2 实测**（`tsc --version` 复查）。**开关名与默认值随版本变**：别按记忆里的默认值假设，以你机器上那版为准。
 
 ## 先划界
 
@@ -94,3 +94,18 @@
 - 类型谓词 `v is T` 是**开发者承诺**，编译器不检查函数体是否真能判定 `T`；谓词实现错误时收窄结果在运行期无效。不报：谓词函数体已实现完整运行时检查
 - 断言函数 `function assert(v: unknown): asserts v is T` 靠抛错终止——返回即承诺 `v` 是 `T`；函数体不抛、或抛错条件不完整时，承诺为假。不报：断言函数体覆盖了所有非 `T` 的输入
 - 控制流收窄在回调、闭包、`await` 之后**不保持**：`if (x !== null)` 内定义的闭包在调用时 `x` 可能已被重新赋值，编译器不报而运行期读到 `null`。不报：收窄后 `x` 是 `const` 或未被重新赋值
+
+## 官方契约的常咬点（不保证覆盖）
+
+编译器**默认值**层面的咬人处——形态见 `references/lang/method.md` 的「官方契约那一层」。**每条都是 tsc 7.0.2 本机实测**（`tsc --version` 复查）；这里没写的当场查原文。**默认值随版本前移过**，从旧版迁移过来的项目会看到一批新错。
+
+- **`strictNullChecks` 在 7.0.2 上默认就是开的**（实测：`let s: string = null;` **不加任何开关**即报 `TS2322: Type 'null' is not assignable to type 'string'`；加 `--strictNullChecks false` 或 `--strict false` 才放行）——按"默认为关"写的代码与配置说明已经过期。不报：项目 tsconfig 里已显式写死并文档声明
+- **`noImplicitOverride` 不在 `strict` 里**（实测：`--strict` 下覆写基类方法不报，加 `--noImplicitOverride` 才报 `TS4114: This member must have an 'override' modifier`）——以为"开了 strict 就都查了"会漏掉改名后静默不再覆写的情形。不报：项目未使用继承，或该开关已单独开启
+- **`noUncheckedIndexedAccess` 也不在 `strict` 里**（实测：`--strict` 下 `const n: number = arr[5]` 通过，加该开关才报 `number | undefined` 不可赋给 `number`）——越界读在类型上仍然"安全"，运行期拿到 `undefined`。不报：该开关已单独开启，或索引来源已保证在界内
+- **`useDefineForClassFields` 随 `target` 变，后果是运行期反转**（实测同一份源码：`--target es2021` 编成 `this.v = 2`，运行期抛 `TypeError: Cannot set property v of #<P> which has only a getter`；`--target es2022` 编成 `v = 2`，运行期输出 `2`）——**子类字段与基类取值器相遇时，换个 target 就从能跑到崩溃**。不报：目标 target 已固定，且类层次里没有同名取值器
+- **`noEmitOnError` 默认 `false`：有类型错误时 JS 照样产出**（实测：`const bad: number = "x";` 报 `TS2322`、退出码非零，而 `.js` **仍然被写出**；加 `--noEmitOnError` 才不写）——构建脚本只看退出码而不清理产物时，仓库里会留下与被拒源码对应的 JS。不报：构建流程会先清理产物目录，或按产物发布
+- **不传 `--target` 时默认不做降级**（实测：类字段与箭头函数原样保留为 `class K { x = 1; y = () => 2; }`）——**默认目标随 tsc 版本前移过，别按 ES5 时代的记忆假设**它会降级成函数构造器。不报：项目显式声明了 `target`
+
+## 报告
+
+本件只给清单，不含报告契约——**档位与报告形态以 `references/contract.md` 为准**。本件条目多且机械，**命中多不等于分量重**。
