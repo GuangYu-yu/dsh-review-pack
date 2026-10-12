@@ -18,7 +18,7 @@
 
 `-fsanitize=undefined` **不含**整数那一组：无符号回绕、隐式截断与符号转换要另加 `-fsanitize=integer,implicit-conversion`。未初始化读取在 MSan 跑不起来的平台上，可用 `-ftrivial-auto-var-init=pattern` 兜。
 
-前提是它真的跑过：CI 里没有这一步时，先自己跑一遍，或先把它接进 CI。
+前提是它真的跑过：CI 里没有这一步时，先自己跑一遍。
 
 ## 先划界
 
@@ -93,3 +93,17 @@
 - `volatile` 当同步原语——它不提供原子性和内存序。不报：仅用于 MMIO 或 `sig_atomic_t` 信号处理
 - `memory_order_consume` 的依赖关系被误用：编译器可将其提升为 `acquire` 或降级为 `relaxed`，语义不可靠。不报：已替换为 `acquire`
 - 两个 `atomic` 之间用 `relaxed` 建立同步：只保证原子性，不保证可见性顺序。不报：已文档声明仅需原子性
+
+## 官方契约的常咬点（不保证覆盖）
+
+整数运算**规范定死的边界**——形态见 `references/lang/method.md` 的「官方契约那一层」。**出处是 cppreference 的 C 算术运算符页**（它逐段标注了对应的 C 标准条款号，本册条目引用的是 C17 的 6.5.5 / 6.5.6 / 6.5.7）；**编译器版本与旗标以你机器上那版为准**。这里没写的当场查原文。
+
+- **整数除法向零截断，`%` 的符号跟随被除数**（规范原文：C99 起 "truncated towards zero"；余数满足 "`(a / b) * b + a % b == a`"）——所以 `-7 / 2` 是 `-3`、`-7 % 2` 是 `-1`。**向下取整**要自己写（`(a % b + b) % b` 一类），取模分桶在负数上会落到负下标。不报：操作数已证非负
+- **除数为零是未定义行为**，而 `INT_MIN % -1` **也是**（规范原文：商不可表示时 "the behavior of both a/b and a%b is undefined"，并直接点名 "INT_MIN % -1 is undefined on 2's complement systems"）——这一处最容易在"取模一定安全"的假设下漏掉。不报：除数已证非零且不是 `-1`
+- **`-INT_MIN` 是未定义行为**（规范原文："The unary minus invokes undefined behavior due to signed integer overflow when applied to INT_MIN, LONG_MIN, or LLONG_MIN"）——求绝对值的惯用写法（`x < 0 ? -x : x`）在最小值上就是 UB，而它恰好在很多真实输入里出现。不报：入参值域已排除各类型最小值
+- **有符号右移负数是实现定义，不是"算术右移"**（规范原文："For negative LHS, the value of LHS >> RHS is **implementation-defined**"）——用它做"除以 2 的幂"在换编译器后可能换了结果；无符号右移才是良定义的。不报：左操作数已证非负，或已改用除法
+- **有符号左移溢出是未定义行为，无符号左移是模 2ⁿ**（规范原文：signed 且结果不可表示时 "the behavior is undefined"；unsigned 则是 "reduced modulo maximum value of the return type plus 1"）——同一句 `x << n` 在 `int` 与 `unsigned` 上是两种保证。不报：移位量与值域已受约束
+
+## 报告
+
+本件只给清单，不含报告契约——**档位与报告形态以 `references/contract.md` 为准**。本件条目多且机械，**命中多不等于分量重**。
