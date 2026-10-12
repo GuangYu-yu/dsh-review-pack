@@ -28,7 +28,7 @@
 
 轴在时间上同样成立：旧组件硬编码值、新组件引令牌，即两个定义点。不报：新旧组件并行是文档声明的迁移策略。
 
-**定义点在哪随技术栈变。** Web 的常见位置：CSS 变量（`:root` 与组件内 scoped）、Tailwind（`tailwind.config` 与内联 arbitrary value `[12px]`）、CSS-in-JS（`theme` 对象与 inline style）、令牌文件与生成出来的 CSS 之间、组件库的主题层与组件自身覆盖（slot、`::part`、`!important`）、JSX `style={}` 与样式表之间。
+**定义点在哪随技术栈变。** Web 的常见位置：CSS 变量（`:root` 与组件内 scoped）、Tailwind（`tailwind.config` 与内联 arbitrary value `[12px]`）、CSS-in-JS（`theme` 对象与 inline style）、令牌文件（**DTCG JSON** 是这个格式的标准）与生成出来的 CSS 之间、组件库的主题层与组件自身覆盖（slot、`::part`、`!important`）、JSX `style={}` 与样式表之间。
 
 ## 定义点与消费来源
 
