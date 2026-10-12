@@ -113,3 +113,18 @@
 - `replace` 指向本地路径，别人克隆下来构建失败。不报：仓库文档写明了这是开发用途，发布不经过它
 - 依赖的 import path 指向 fork，而没有注释说明为什么用 fork。不报：仓库文档已写明
 - `init()` 里发网络请求、起 goroutine、读环境或文件——`init` 没有错误返回路径，错误只能吞掉或 panic，测试也没法重置。不报：`init` 只做纯计算或变量初始化
+
+## 官方契约的常咬点（不保证覆盖）
+
+标准库**文档注释里的契约**层面的咬人处——形态见 `references/lang/method.md` 的「官方契约那一层」。**出处是标准库源码的文档注释**（`net/http/client.go`、`io/io.go`），也就是 `references/contract.md` 认的"上游源码"；**版本以你机器上那版为准**——`go doc net/http.Client`、`go doc io.Reader` 就是复查命令。这里没写的当场查原文。
+
+- **`http.Client` 的零值可用，但 `Timeout` 的零值表示"没有超时"**（文档注释原文 "A Timeout of zero means no timeout"，实现是 `func (c *Client) deadline() { if c.Timeout > 0 { … } return time.Time{} }`）——于是 `&http.Client{}` 与 `http.DefaultClient` 都会**无限期等下去**，而默认传输层本身不设整体超时。不报：调用点已传带 `Deadline` 的 `ctx`，或已显式设 `Timeout`
+- **跨域重定向会静默丢掉敏感头**（文档注释原文：`Authorization`、`WWW-Authenticate`、`Cookie` 在跳到"非初始域的子域或同域"时被忽略）——认证请求跟着重定向走到另一个域时，**第二个请求是匿名的**，而这不会报错。不报：重定向不跨域，或认证由自定义 `CheckRedirect` 重新附加
+- **默认只跟 10 次重定向**（文档注释原文：`CheckRedirect` 为 nil 时用默认策略，"stop after 10 consecutive requests"）——环状重定向在请求层就终止，靠它当"重试预算"是不可靠的。不报：已显式设置 `CheckRedirect`
+- **一次 `Read` 可能只读到一部分**（`io.Reader` 文档注释：若可用数据不足 `len(p)`，"Read conventionally returns what is available instead of waiting for more"）——`n, _ := r.Read(buf)` 之后直接当 `buf[:n]` 是完整的，是最常见的一类截断；要读满用 `io.ReadFull`（同文件：读满 `len(buf)` 才返回 nil）。不报：该处本就按"读到多少算多少"处理（流式拷贝、`io.Copy`）
+- **`Read` 返回 `(0, nil)` 不代表 EOF**（文档注释原文："Callers should treat a return of 0 and nil as indicating that nothing happened; in particular it does not indicate EOF"）——把"读到 0 字节"当结束条件的循环会提前收工。不报：循环同时判断了 `err`
+- **`Write` 返回 `n < len(p)` 时必须给非 nil error**（文档注释原文 "Write must return a non-nil error if it returns n < len(p)"）——依赖这一点写的写入循环，遇到不守约的实现会**静默丢数据**；`io.ErrShortWrite` 就是为这种情况准备的。不报：写入用的是 `io.Copy`/`fmt.Fprint` 一类已经处理短写的封装
+
+## 报告
+
+本件只给清单，不含报告契约——**档位与报告形态以 `references/contract.md` 为准**。本件条目多且机械，**命中多不等于分量重**。
