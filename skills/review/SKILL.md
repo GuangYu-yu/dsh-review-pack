@@ -9,7 +9,7 @@ metadata:
 
 # 评审入口
 
-**分册在哪**：与本文件同目录的 `references/`（语言清单在 `references/lang/`）。读完本节，只去读命中的那几份，**不要通读 `references/`**。
+**分册在哪**：与本文件同目录的 `references/`（按栈与按外观规格的清单在 `references/lang/` 与 `references/theme/`）。读完本节，只去读命中的那几份，**不要通读 `references/`**。
 
 ## 一、每次评审读哪几份
 
@@ -36,8 +36,8 @@ metadata:
 | 补丁 / diff / PR / 变更集 | `references/diff.md` |
 | 一份实现（文件、模块）的质量 | `references/code.md` |
 | 结构与边界：模块划分、依赖方向 | `references/architecture.md` |
-| 某语言的语义：机制与陷阱 | `references/lang/<语言名全小写>.md`（如 Rust 是 rust.md、C++ 是 cpp.md；先按这个名字试读，读不到才走下一行） |
-| 为一门没有现成清单的语言现场推导清单 | `references/lang/method.md` |
+| 某语言或某个界面栈的语义：机制与陷阱 | `references/lang/<栈名全小写>.md`（如 Rust 是 rust.md、C++ 是 cpp.md、Web 界面是 web.md；先按这个名字试读，读不到才走下一行） |
+| 为一个还没有清单的栈现场推导清单 | `references/lang/method.md` |
 | 失败路径的设计：重试、超时、恢复、回滚 | `references/robustness.md` |
 | 性能：代价随规模放大、往返、争用 | `references/performance.md` |
 | 安全：判定权、越权、被信任的边界、秘密 | `references/security.md` |
@@ -47,6 +47,7 @@ metadata:
 | 运维面：可观测性、告警、回退、权限 | `references/operability.md` |
 | 文档 / 配置 / 契约 / 数据 / 依赖的事实与一致性 | `references/docs-config.md` |
 | 方案与意见的取舍裁决 | `references/style.md` |
+| 对象或用户指定了某套外观规格（主题、设计规范）：代码有没有绕开它 | `references/theme/<规格名全小写>.md`（先按这个名字试读；**没有声明就不读**，判据见 `references/theme/method.md`） |
 | 已有结论的溯源与证伪 | `references/reasoning.md` |
 
 阶段件（可选一个，不默认加载）：
