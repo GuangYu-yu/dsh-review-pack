@@ -12,7 +12,7 @@
 // 输出是给人看的：每条不通过都带行号与期望值，改完再跑一次。
 
 import { readFileSync, existsSync } from 'node:fs';
-import { dirname, isAbsolute, join } from 'node:path';
+import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const LEVELS = ['严重', '一般', '待查'];
@@ -386,8 +386,12 @@ export function scanText(reportPath, text) {
       const ledgerTotal = Number(m[2]);
       const k = Number(m[3]);
       const declared = vis.some((l) => l.includes('不随报告交付'));
-      const p = isAbsolute(m[1]) ? m[1] : join(dirname(reportPath), m[1]);
-      if (!declared && !existsSync(p)) fail(ledgerIdx + 1, `账本路径够不着（${m[1]}）——要么随报告交付，要么在这一行明说它不随报告交付`);
+      // 路径基准有两个：报告所在目录（报告与账本通常放在一起），以及当前目录
+      // （账本在工作区根、报告在子目录里时，写的是相对根的那个路径）。都试一次，
+      // 只要有一个够得着就算过——够不着才是错误。
+      const candidates = isAbsolute(m[1]) ? [m[1]] : [join(dirname(reportPath), m[1]), resolve(m[1])];
+      const reachable = candidates.some((q) => existsSync(q));
+      if (!declared && !reachable) fail(ledgerIdx + 1, `账本路径够不着（${m[1]}）——按报告所在目录与当前目录都没找到；要么随报告交付，要么在这一行明说它不随报告交付`);
       if (A !== null && k !== A.rows.length) fail(ledgerIdx + 1, `账本行说「上表 ${k} 条」，A 表实际 ${A.rows.length} 条`);
       const rest = /另\s*(\d+)\s*条见账本/.exec(lines.join('\n'));
       if (rest === null) {

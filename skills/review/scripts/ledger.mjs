@@ -139,7 +139,7 @@ function parseBasis(cell, push) {
 /** 单行结构化；不合法也返回对象，问题记在 problems 里。 */
 export function readRow(row, push, columnsExpected = COLUMNS) {
   if (row.cells.length !== columnsExpected.length) {
-    push(`一行必须是 ${columnsExpected.length} 列，这一行是 ${row.cells.length} 列`);
+    push(`一行必须是 ${columnsExpected.length} 列，这一行是 ${row.cells.length} 列——正文里的竖线要写成 \\|（Rust 闭包 |e|、|| 、位或都算）`);
     return null;
   }
   const [n, level, basisCell, loc, problem, fix, counter, retract] = row.cells.map((c) => c);
