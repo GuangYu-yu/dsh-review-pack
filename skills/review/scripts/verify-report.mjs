@@ -366,8 +366,13 @@ export function scanText(reportPath, text) {
     for (const r of cRows) {
       const [id, form, cur, lean, held] = r.cells;
       if (!FORMS.includes(form)) fail(r.line, `决策点 #${id} 的形态「${form}」不是 ${FORMS.join('／')} 之一`);
-      if (form === '根' && (held === undefined || held.trim() === '' || held.trim() === '-')) {
-        fail(r.line, `决策点 #${id} 是「根」，但「挂住的条目」空着——根要几条才看得见`);
+      if (form === '根') {
+        const heldIds = (held || '').match(/#\d+/g) || [];
+        if (held.trim() === '' || held.trim() === '-') {
+          fail(r.line, `决策点 #${id} 是「根」，但「挂住的条目」空着——根要几条才看得见`);
+        } else if (heldIds.length < 2) {
+          fail(r.line, `决策点 #${id} 是「根」，但只挂住 ${heldIds.length} 条——根至少要两条，一条发现不谈根`);
+        }
       }
       if (cur === '' || lean === '') fail(r.line, `决策点 #${id} 的「现状或位置」或「倾向」空着`);
     }
