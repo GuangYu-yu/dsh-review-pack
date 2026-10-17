@@ -2,11 +2,6 @@
 
 **状态**：候选池——**覆盖不保证**，当检索线索用，每条的成立仍要按位置核实。
 
-## 先划界
-
-- 本册问的是"**Go 的机制让这个缺陷怎么发生**"。goroutine 泄漏、循环里的 `defer`、`Timer`/`Ticker` 不 `Stop` 这些**同时也是失败路径**，`references/robustness.md` 会从"出事之后会怎样"那一侧再问一遍（它的「资源与规模」与「生命周期耦合」两节）。同一处两边都可能命中：**报一处，说清是按哪条判的**，不要两册各报一遍。
-- `defer` 的**清理顺序与成对性**属于生命周期，归 `references/robustness.md`；本册只管 `defer` 本身的语义（参数求值时机、具名返回值被改写、`os.Exit` 不执行 `defer`）。
-
 ## 先跑工具链，工具链报的不写进本件
 
 `go vet ./...` 默认跑全部检查；当前集合用 `go tool vet help` 查。与本册边界相关的是这批（分析器名对照 Go 1.27）：`copylocks`（按值传含锁的类型）、`lostcancel`（`cancel` 没调）、`waitgroup`（`Add` 写在 `go func` 内部，与 `Wait` 形成竞态）、`loopclosure`、`errorsas`（传给 `errors.As` 的不是非 nil 指针或非 error）、`printf` / `slog`（格式串与结构化日志调用）、`unsafeptr`（`uintptr` 与 `unsafe.Pointer` 的非法转换）、`unusedresult`、`cgocall`（部分 cgo 指针传递规则）、`unreachable`、`structtag`、`stdversion`、`testinggoroutine`、`httpresponse`。注意 `unusedresult` 只覆盖它清单内的函数，不是"任何被丢弃的返回值"。
@@ -18,6 +13,11 @@
 `go build` / `go test` 自己就报的同样不列：未使用变量、未使用导入、循环导入、`gofmt` 格式问题。
 
 `go test -race ./...` 只覆盖**实际跑到**的路径。跑到的那条不写；测试覆盖不到的并发路径上的竞争仍要写。
+
+## 先划界
+
+- 本册问的是"**Go 的机制让这个缺陷怎么发生**"。goroutine 泄漏、循环里的 `defer`、`Timer`/`Ticker` 不 `Stop` 这些**同时也是失败路径**，`references/robustness.md` 会从"出事之后会怎样"那一侧再问一遍（它的「资源与规模」与「生命周期耦合」两节）。同一处两边都可能命中：**报一处，说清是按哪条判的**，不要两册各报一遍。
+- `defer` 的**清理顺序与成对性**属于生命周期，归 `references/robustness.md`；本册只管 `defer` 本身的语义（参数求值时机、具名返回值被改写、`os.Exit` 不执行 `defer`）。
 
 ## 错误处理
 
@@ -113,6 +113,11 @@
 - `replace` 指向本地路径，别人克隆下来构建失败。不报：仓库文档写明了这是开发用途，发布不经过它
 - 依赖的 import path 指向 fork，而没有注释说明为什么用 fork。不报：仓库文档已写明
 - `init()` 里发网络请求、起 goroutine、读环境或文件——`init` 没有错误返回路径，错误只能吞掉或 panic，测试也没法重置。不报：`init` 只做纯计算或变量初始化
+
+## 时间
+
+- **`time.Time` 用 `==` 比的是结构体各字段，不是时刻**（`time` 包文档：`==` 比较的是 instant、Location 与单调时钟读数）——同一时刻、不同 `Location` 的两个值 `==` 为假，用 `t1.Equal(t2)`。跨时区、跨 `Parse`／`Now` 来源的时间比较必须用 `Equal`／`Before`／`After`。不报：两值来源相同（同一次 `Now()`）或已 `UTC()` 归一
+- **`time.Parse` 不带时区偏移按 UTC 解析**，`time.ParseInLocation` 才按给定时区——「解析出来的日期差了 8 小时」多半是这一条。不报：格式串里已含 `Z07:00` 一类偏移
 
 ## 官方契约的常咬点（不保证覆盖）
 

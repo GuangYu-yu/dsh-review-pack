@@ -70,6 +70,7 @@
 - `char` 的符号性平台依赖。不报：显式使用 `signed char`/`unsigned char`
 - 浮点到整数转换溢出。不报：已检查范围，或使用 `std::lround`/`std::clamp`
 - 枚举值隐式转换到整数后丢失符号。不报：枚举已声明底层类型
+- **浮点相等与 NaN**：`x == x` 对 NaN 恒假，判 NaN 用 `std::isnan`；**`-ffast-math`（含 `-ffinite-math-only`）下这些检查会被优化掉**，编译选项与代码里的 NaN 判断必须一起看。判近似相等要容差（`std::abs(a-b) <= eps`），`==` 只用于整数或已证精确的值。不报：比较的是整型，或输入已确认非 NaN
 
 ## 求值顺序
 

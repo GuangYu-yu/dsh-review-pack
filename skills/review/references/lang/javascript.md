@@ -28,6 +28,7 @@
 - `Promise` 构造函数中同步抛出的异常被转为 rejected promise，不会被外层 `try/catch` 捕获。不报：调用方已 `.catch` 或 `await`
 - 未处理的 promise rejection 在 Node 中触发 `unhandledRejection`，浏览器中触发 `unhandledrejection`；**Node ≥15 默认把未处理的 rejection 升级成未捕获异常，进程带非零码退出**（只有 `--unhandled-rejections=warn` 才是"只警告"）；浏览器侧同样不静默，会在控制台打 `Uncaught (in promise)`。所以它不是"没人看见"，是**一条能拖掉整个进程的失败路径**——别按低危处理。不报：已注册全局监听，或每个 promise 都已处理
 - `async` 函数返回的 promise 中抛出的异常，调用方不 `await` 就看不到。不报：调用点必然 `await` 或 `.catch`
+- **取消不是自动的**：`AbortController`／`AbortSignal` 只在你显式把它传下去时才生效（`fetch(url, { signal })`、`addEventListener(..., { signal })`、或自己的异步函数主动检查 `signal.aborted`）；`setTimeout`／`setInterval` 必须自己 `clearTimeout`／`clearInterval`，promise 链没有取消语义——`Promise.race` 只是先返回，另一条仍在跑。组件卸载、请求被新请求取代时没做这件事，就是**两条路径同时写同一份状态**。不报：调用点已传 `signal`，或定时器在同一个作用域里被清掉
 - `forEach`/`map` 里传 `async` 回调：回调返回的 promise 没有任何东西在等——外层循环立刻走完，异常也无处可去（Node 实测：外层早已继续，回调里的 `await` 之后才完成）。不报：已改用 `for...of` + `await`，或 `Promise.all(arr.map(...))`
 
 ## 类型转换与相等

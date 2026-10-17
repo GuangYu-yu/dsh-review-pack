@@ -74,7 +74,7 @@
 
 - `is` 对小整数（`-5..256`）和部分短字符串走缓存，相同字面量在不同位置可能 `is` 为真或为假（3.13 实测：小整数与拼接串为真、`int('257') is int('257')` 为假）。不报：比较的是 `None`、`True`、`False` 等单例
 - `bool` 是 `int` 的子类，`True == 1`、`isinstance(True, int)` 为真，用 `isinstance(x, int)` 过滤时布尔值也被接收。不报：已显式排除 `bool`（`type(x) is int` 或 `not isinstance(x, bool)`）
-- `float('nan')` 与自身不相等、`nan in [nan]` 为假，`x != x` 是惯用法但要求读者知道 IEEE 754 的 NaN 不自等。不报：已用 `math.isnan(x)`
+- `float('nan')` 与自身不相等（`x != x` 为真），但**`nan in [nan]` 为真**——`in` 先按同一对象（`is`）比，同一个 nan 对象直接命中；换成两个不同的 nan 对象才是 `False`，而同一个列表上 `[n].index(n)` 反而抛 `ValueError`。**别用 `in`／`index`／`==` 判 NaN**，用 `math.isnan(x)`。不报：已用 `math.isnan(x)`
 - 大整数 `a / b` 返回 `float`，超 53 位尾数丢精度；该用 `a // b` 或 `Fraction`。不报：两侧都是源码常量，且结果不用于相等判断或金额
 - `round` 是银行家舍入（3.13 实测：0.5→0、1.5→2、2.5→2），与数学教材的"四舍五入"不同。不报：已使用 `Decimal.quantize` 或显式加 `0.5`
 - 从 JSON/环境变量读入的"数字"常是 `str`：`'5' < 10` 抛 `TypeError`（3.13 实测），`'a' + b'a'` 同理。不报：类型已在读取边界处显式转换

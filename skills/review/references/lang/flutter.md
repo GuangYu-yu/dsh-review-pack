@@ -33,7 +33,7 @@
 - `FutureBuilder` 未指定 `future` 参数，UI 永远停在 `ConnectionState.waiting`。不报：`future` 已显式传入且非 null
 - `StreamBuilder` 的 `stream` 在 `build` 中直接创建，每次 rebuild 重新订阅。不报：已在 `initState` 中创建并缓存
 - **订阅被交给别的对象保管，本 widget 的 `dispose` 里就没有它了**——`cancel_subscriptions` 只看得到本类自己持有的 `StreamSubscription`。不报：`dispose()` 中已取消本 widget 创建的全部定时器与订阅，或所有权已显式移交并写明
-- 同步计算阻塞主 isolate，UI 帧率下降或卡顿。不报：计算已在 `Isolate.run` / `compute` 中执行 [半可判定]
+- 同步计算阻塞主 isolate，UI 帧率下降或卡顿。不报：计算已在 `Isolate.run` / `compute` 中执行 [半可判]
 
 ## 动画与 Ticker
 
@@ -52,17 +52,17 @@
 ## 状态管理与数据流
 
 - `context.watch<T>()` 在 `build` 之外调用，抛 "Tried to listen to a provider outside of build"。不报：`build` 之外用 `context.read<T>()` 取一次性数据
-- `context.read<T>()` 在 `build` 中调用且期望数据变化时重建，但 `read` 不监听变化。不报：该数据在 widget 生命周期内不会变化 [半可判定]
-- `InheritedWidget` 的 `updateShouldNotify` 返回 `false`，依赖方收不到通知。不报：该数据确实不需要通知依赖方 [半可判定]
+- `context.read<T>()` 在 `build` 中调用且期望数据变化时重建，但 `read` 不监听变化。不报：该数据在 widget 生命周期内不会变化 [半可判]
+- `InheritedWidget` 的 `updateShouldNotify` 返回 `false`，依赖方收不到通知。不报：该数据确实不需要通知依赖方 [半可判]
 - 依赖 `InheritedWidget` 的 widget 在 `initState` 中读它的值，此时依赖关系尚未建立。不报：读取在 `build` 或 `didChangeDependencies` 中执行
 - Provider / Riverpod 的 `Provider` 在 widget 中初始化，每次 rebuild 重新创建。不报：provider 已在 widget 树的稳定位置声明
-- `dependOnInheritedWidgetOfExactType` 与 `getElementForInheritedWidgetOfExactType` 混用：前者注册依赖、变化时通知，后者不注册。需要随数据重建的位置用了后者，UI 不更新。不报：有意只取数据、不建立依赖 [半可判定]
-- `ValueNotifier` 未在 `dispose` 中释放，widget 卸载后 `ValueListenableBuilder` 仍被通知。不报：生命周期已由作用域内 `dispose` 覆盖，或该 notifier 由外部传入、所有权不在本 widget [半可判定]
+- `dependOnInheritedWidgetOfExactType` 与 `getElementForInheritedWidgetOfExactType` 混用：前者注册依赖、变化时通知，后者不注册。需要随数据重建的位置用了后者，UI 不更新。不报：有意只取数据、不建立依赖 [半可判]
+- `ValueNotifier` 未在 `dispose` 中释放，widget 卸载后 `ValueListenableBuilder` 仍被通知。不报：生命周期已由作用域内 `dispose` 覆盖，或该 notifier 由外部传入、所有权不在本 widget [半可判]
 - 在 `ValueListenableBuilder` 的 `builder` 中改其 `valueListenable` 的值，触发递归重建。不报：`builder` 中只读不写
 
 ## 通知与冒泡
 
-- `NotificationListener.onNotification` 返回 `true` 阻止冒泡、`false` 继续向上。该阻止处返回了 `false`（或反之），通知被意外拦截或重复处理。不报：已文档声明该返回值就是设计意图 [半可判定]
+- `NotificationListener.onNotification` 返回 `true` 阻止冒泡、`false` 继续向上。该阻止处返回了 `false`（或反之），通知被意外拦截或重复处理。不报：已文档声明该返回值就是设计意图 [半可判]
 
 ## 导航与路由
 
@@ -94,9 +94,9 @@
 - `AutomaticKeepAliveClientMixin` 的 `wantKeepAlive` 返回 `true` 却从不调用 `updateKeepAlive()` 使其转 `false`，离开可视区域后仍被保活，内存持续占用。不报：`wantKeepAlive` 返回 `false`，或 `updateKeepAlive()` 已在状态变化时调用
 - `ImageStreamListener` 经 `ImageStream.addListener` 添加后未在 `dispose` 中 `removeListener`，图片流持续持有 widget 引用。不报：已在 `dispose` 中移除，或它的生命周期不跨越 widget 卸载
 
-## 半可判定条目汇总
+## 半可判条目汇总
 
-位置指得到、但"这一处的豁免成不成立"要人判的，都在下表。核验时逐条回答，**不许与完全可判定的混排**；答不上来的按「未判」写进报告的覆盖限制。
+位置指得到、但"这一处的豁免成不成立"要人判的，都在下表。核验时逐条回答，**不许与完全可判的混排**；答不上来的按「未判」写进报告的覆盖限制。
 
 | 出处 | 条目 |
 |---|---|

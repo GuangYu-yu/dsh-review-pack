@@ -22,8 +22,8 @@ export const CONFIDENCE = ['可证', '一环未读全', '存疑'];
 const HARD_BASES = ['跑了命令', '引了原文'];
 
 const SEPARATOR = /^\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?$/;
-const ANCHOR = /`?([A-Za-z0-9_./\\-]+\.[A-Za-z0-9]+):(\d+)(?:-(\d+))?`?/;
-const EMOJI = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}]/u;
+const ANCHOR = /`?([A-Za-z0-9_./\\:-]*\.[A-Za-z0-9]+):(\d+)(?:-(\d+))?`?/;
+const EMOJI = /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F}]/u;
 
 function splitRow(line) {
   const trimmed = line.trim().replace(/^\|/, '').replace(/\|$/, '');
@@ -45,6 +45,10 @@ function splitRow(line) {
   }
   cells.push(cur.trim());
   return cells;
+}
+
+function esc(s) {
+  return String(s).replace(/\|/g, '\\|');
 }
 
 function stripCode(s) {
@@ -82,12 +86,12 @@ export function parseLedger(text, file = '<ledger>') {
       continue;
     }
 
+    if (SEPARATOR.test(line)) continue;
+
     if (!line.startsWith('|')) {
       problems.push({ file, line: no, msg: `账本里出现了不属于任何表的文字：${line.slice(0, 40)}` });
       continue;
     }
-
-    if (SEPARATOR.test(line)) continue;
 
     const cells = splitRow(raw);
     const head = cells[0].replace(/`/g, '');
@@ -267,7 +271,7 @@ export function mergeLedgers(inputs, { dedupe = true } = {}) {
     for (const section of block.sections) {
       const kept = [];
       for (const row of section.rows) {
-        const key = `${row.locPath}:${row.locFrom}|${row.problem}`;
+        const key = `${row.locPath}:${row.locFrom}|${row.problem}|${row.level}|${row.basis}`;
         if (dedupe && seen.has(key)) {
           notes.push({ file: row.file, line: row.line, msg: `合并时去掉一条重复：${row.locPath}:${row.locFrom}` });
           continue;
@@ -281,11 +285,13 @@ export function mergeLedgers(inputs, { dedupe = true } = {}) {
       out.push('');
       out.push(`| ${COLUMNS.join(' | ')} |`);
       out.push(`|${COLUMNS.map(() => '---').join('|')}|`);
+      let k = 0;
       for (const row of kept) {
+        k += 1;
         out.push(
-          `| ${row.n} | ${row.level} | ${row.basisCell} | \`${row.locPath}:${row.locFrom}${
+          `| ${k} | ${esc(row.level)} | ${esc(row.basisCell)} | \`${row.locPath}:${row.locFrom}${
             row.locTo !== row.locFrom ? `-${row.locTo}` : ''
-          }\` | ${row.problem} | ${row.fix} | ${row.counter} | ${row.retract} |`,
+          }\` | ${esc(row.problem)} | ${esc(row.fix)} | ${esc(row.counter)} | ${esc(row.retract)} |`,
         );
       }
       out.push('');
