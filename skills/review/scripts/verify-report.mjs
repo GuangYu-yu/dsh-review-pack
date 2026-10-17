@@ -18,7 +18,7 @@ import { pathToFileURL } from 'node:url';
 const LEVELS = ['严重', '一般', '待查'];
 const EVIDENCE = ['跑了命令', '引了原文', '读源码', '推断'];
 const CONFIDENCE = ['可证', '一环未读全', '存疑'];
-const FORMS = ['收口', '默认值', '根'];
+const FORMS = ['收口', '默认值'];
 const SECTION_NAMES = ['发现的问题', '决策点', '停止审查的依据'];
 
 const A_HEAD = ['#', '级别', '依据', '位置', '问题', '修复方向'];
@@ -360,21 +360,29 @@ export function scanText(reportPath, text) {
   }
 
   // ---- C 表 ----
+  // 决策点「挂住的条目」要能回指 A 表；A 表可能不存在（零发现），那时任何挂条目都算编的。
+  const aIdSet = A === null ? [] : A.rows.map((r) => cell(r, 0));
   const cRows = C === null ? [] : C.rows.filter((r) => r.cells.length === C.header.length);
   if (C !== null) {
     if (C.rows.length > 3) fail(C.start, `决策点至多 3 行，实际 ${C.rows.length} 行`);
     for (const r of cRows) {
       const [id, form, cur, lean, held] = r.cells;
       if (!FORMS.includes(form)) fail(r.line, `决策点 #${id} 的形态「${form}」不是 ${FORMS.join('／')} 之一`);
-      if (form === '根') {
-        const heldIds = (held || '').match(/#\d+/g) || [];
-        if (held.trim() === '' || held.trim() === '-') {
-          fail(r.line, `决策点 #${id} 是「根」，但「挂住的条目」空着——根要几条才看得见`);
-        } else if (heldIds.length < 2) {
-          fail(r.line, `决策点 #${id} 是「根」，但只挂住 ${heldIds.length} 条——根至少要两条，一条发现不谈根`);
-        }
+      const heldIds = (held || '').match(/#\d+/g) || [];
+      const need = form === '收口' ? 2 : 1;
+      if (held.trim() === '' || held.trim() === '-') {
+        fail(r.line, `决策点 #${id} 的「挂住的条目」空着——${form}至少要挂 ${need} 条`);
+      } else if (heldIds.length < need) {
+        fail(r.line, `决策点 #${id} 是「${form}」，只挂住 ${heldIds.length} 条——至少要 ${need} 条`);
       }
-      if (cur === '' || lean === '') fail(r.line, `决策点 #${id} 的「现状或位置」或「倾向」空着`);
+      for (const h of heldIds) {
+        const n = h.slice(1);
+        if (!aIdSet.includes(n)) fail(r.line, `决策点 #${id} 挂住了 ${h}，A 表里没有这一条`);
+      }
+      if (!/^修在\s*[^：]{1,24}：/.test(lean.replace(/^`+|`+$/g, '').trim())) {
+        fail(r.line, `决策点 #${id} 的「倾向」要以「修在 <级别>：」开头（这一行／函数的契约／模块接口／项目规范／平台惯例）`);
+      }
+      if (cur === '') fail(r.line, `决策点 #${id} 的「现状或位置」空着`);
     }
   }
 
