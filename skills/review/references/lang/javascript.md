@@ -4,7 +4,7 @@
 
 ## 先跑工具链，工具链报的不写进本件
 
-`eslint` / `oxlint` 配合 `eslint-plugin-security` 覆盖一部分：`eval`、`new Function`、`innerHTML`、`child_process` 命令注入、弱哈希、不安全随机数。**该插件的覆盖面有限**——原型污染、ReDoS、时序攻击这一类它不管（具体规则以你机器上那版的规则表为准）。
+`eslint` / `oxlint` 配合 `eslint-plugin-security` 覆盖一部分：`eval`、`new Function`、`innerHTML`、`child_process` 命令注入、弱哈希、不安全随机数。**该插件对原型污染、ReDoS、时序攻击只有启发式规则**（`detect-unsafe-regex` 管 ReDoS、`detect-possible-timing-attacks` 管拿 `==`／`===` 比敏感值）：误报多、覆盖窄，**能用不等于可信**——报了要逐个看，没报不等于没有（规则名以你机器上那版的规则表为准）。
 
 `tsc --noEmit` / `tsc --checkJs` 覆盖类型错误（JS 中依赖 JSDoc）。`node --check` 覆盖语法。
 
@@ -26,7 +26,7 @@
 - 同步代码阻塞事件循环时，浏览器中用户无法交互、页面无法渲染，Node 中其他请求全部挂起。不报：阻塞操作已被拆分到 Web Worker / Worker Threads / 子进程
 - `await` 之后的微任务在当前宏任务内全部执行完，不管新增多少微任务；`setTimeout` 等宏任务要等微任务队列清空后才执行。不报：依赖的正是微任务优先级语义，且已文档声明
 - `Promise` 构造函数中同步抛出的异常被转为 rejected promise，不会被外层 `try/catch` 捕获。不报：调用方已 `.catch` 或 `await`
-- 未处理的 promise rejection 在 Node 中触发 `unhandledRejection`，浏览器中触发 `unhandledrejection`；宿主不监听时静默丢弃。不报：已注册全局监听，或每个 promise 都已处理
+- 未处理的 promise rejection 在 Node 中触发 `unhandledRejection`，浏览器中触发 `unhandledrejection`；**Node ≥15 默认把未处理的 rejection 升级成未捕获异常，进程带非零码退出**（只有 `--unhandled-rejections=warn` 才是"只警告"）；浏览器侧同样不静默，会在控制台打 `Uncaught (in promise)`。所以它不是"没人看见"，是**一条能拖掉整个进程的失败路径**——别按低危处理。不报：已注册全局监听，或每个 promise 都已处理
 - `async` 函数返回的 promise 中抛出的异常，调用方不 `await` 就看不到。不报：调用点必然 `await` 或 `.catch`
 - `forEach`/`map` 里传 `async` 回调：回调返回的 promise 没有任何东西在等——外层循环立刻走完，异常也无处可去（Node 实测：外层早已继续，回调里的 `await` 之后才完成）。不报：已改用 `for...of` + `await`，或 `Promise.all(arr.map(...))`
 

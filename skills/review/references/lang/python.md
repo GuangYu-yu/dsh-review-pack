@@ -23,7 +23,7 @@
 ## 异常
 
 - `except BaseException` 或 `except:` 捕获 `KeyboardInterrupt`、`SystemExit`、`CancelledError`，进程无法中断、协程无法取消。不报：重抛或按类型白名单放行
-- `except Exception as e` 中 `e` 在块结束时被删除，块外引用抛 `UnboundLocalError`（3.13 实测）；闭包持有 `e` 时读到 `None` 或异常。不报：`e` 在块内提取为独立变量，块外不再引用
+- `except Exception as e` 中 `e` 在块结束时被删除，块外引用抛 `NameError: name 'e' is not defined`（函数内才是 `UnboundLocalError`——3.13 实测，两种作用域各跑一次；按异常类型 grep 日志会漏掉模块级与类体级）；闭包持有 `e` 时读到 `None` 或异常。不报：`e` 在块内提取为独立变量，块外不再引用
 - `raise e` 重抛会在 traceback 前面**多插一帧指向重抛点**（3.13 实测：帧数 +1，**原失败位置没丢**），日志里因此多一层无关帧；裸 `raise` 不插。不报：已改用无参 `raise`
 - `raise X from None` 抑制 `__cause__` 链，原始原因在日志和调用方都不可见。不报：`from None` 用于有意隐藏内部细节、且已文档声明
 - `finally` 中的 `return` 或 `break`/`continue` 覆盖 `try` 的返回或跳出，`try` 中的异常被静默吞掉（3.13 实测：异常没传出去）。不报：`try` 块内无异常、`finally` 中无控制流语句
@@ -67,7 +67,7 @@
 - `asyncio.wait_for` / `asyncio.timeout` 超时取消协程，`CancelledError` 从 `await` 点抛出；协程内已获取的资源、已写入的一半状态由谁收拾。拿不出结论的，把每个协程的取消语义写成契约。不报：协程在 `await` 点上无未提交状态
 - `asyncio.shield` 保护的不是整个协程，只是屏蔽了外层取消；内层任务若自己收到取消仍然终止。不报：内层任务不响应 `CancelledError`，且已文档声明
 - `threading.Lock` 未用 `with`，异常路径上锁不释放，其他线程永久阻塞。不报：锁的获取与释放之间无异常路径，或已用 `with` 保证释放
-- `+=`、`check-then-act`、`dict.setdefault` 在**带 GIL 的默认构建**下仍是复合操作，线程可在字节码之间插入（无 GIL 的构建不适用这条前提，但共享可变状态照样要同步）。不报：操作对象只在单线程内可见，或已用锁保护
+- `+=`、`check-then-act`（`if k not in d: d[k] = v`）在**带 GIL 的默认构建**下仍是复合操作，线程可在字节码之间插入（无 GIL 的构建不适用这条前提，但共享可变状态照样要同步）。**`dict.setdefault` 不在这里**：3.13 `dis` 显示它是单条 `CALL`，查与插在 C 层一次完成，没有"查到不存在、还没插"的字节码间隙——它是这类的替代写法。（仅当 key 的 `__hash__`/`__eq__` 本身是 Python 代码时才又露出窗口。）不报：操作对象只在单线程内可见，或已用锁保护，或已改用 `setdefault`/`Counter` 这类把查与插收进一次调用的写法
 - `threading.Event.wait` 与 `Condition.wait` 的丢失唤醒：条件未在持锁状态下检查或通知。不报：等待与通知均在同一把锁下进行，且条件在循环中复检
 
 ## 类型与相等

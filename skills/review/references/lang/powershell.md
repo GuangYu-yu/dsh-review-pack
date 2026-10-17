@@ -6,7 +6,7 @@
 
 `PSScriptAnalyzer`（`Invoke-ScriptAnalyzer`）默认跑它当前的规则集——**有哪些规则用 `Get-ScriptAnalyzerRule` 查**（规则名随版本增删，不在这里固化）。与本册边界相关的是习惯与陷阱那几类：别名与位置参数、`Invoke-Expression`、`Write-Host`、赋值到自动变量、`UseApprovedVerbs` / `UseSingularNouns`、状态改变函数的 `ShouldProcess`。
 
-`Set-StrictMode -Version Latest` 覆盖（在本机 PowerShell 7.6.3 上逐条跑过）：引用未初始化的变量、访问不存在的属性、**用方法语法调用函数**（`Test-MyFn(1,2)` 报 `called as if it were a method`；单参数不带逗号的 `Test-MyFn(1)` 不报）。**它不覆盖"多给位置参数"**——`Test-MyFn 1 2` 静默通过，这一条别指望它。
+`Set-StrictMode -Version Latest` 覆盖（在本机 PowerShell 7.6.3 上逐条跑过）：引用未初始化的变量、访问不存在的属性。**另：`Test-MyFn(1,2)` 报的 `called as if it were a method` 不归它管**——那是参数绑定层的错误，不设 StrictMode 也照抛（单参数 `Test-MyFn(1)` 不报）。**它不覆盖"多给位置参数"**——`Test-MyFn 1 2` 静默通过，这一条别指望它。
 
 前提是它真的跑过：CI 里没有这一步时，先自己跑一遍。
 

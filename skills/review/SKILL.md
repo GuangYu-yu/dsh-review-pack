@@ -13,7 +13,7 @@ metadata:
 
 ## 一、每次评审读哪几份
 
-一次评审 = **1 个必读件 + 1 个对象件 + 可选 1 个阶段件**：
+一次评审 = **1 个必读件 + 1 个对象件 + 那个对象件自己声明必载的册 + 可选 1 个阶段件**（要写报告时再加 `references/format.md`）：
 
 1. **`references/contract.md`——每次都读。** 每条结论怎么挂档位、怎么定级、怎么举证、报告要含什么，细则全在里面。
 2. **对象件——按"被审的是什么"选一个**，见第二节的分发表。
@@ -36,7 +36,7 @@ metadata:
 | 补丁 / diff / PR / 变更集 | `references/diff.md` |
 | 一份实现（文件、模块）的质量 | `references/code.md` |
 | 结构与边界：模块划分、依赖方向 | `references/architecture.md` |
-| 某语言或某个界面栈的语义：机制与陷阱 | `references/lang/<栈名全小写>.md`（如 Rust 是 rust.md、C++ 是 cpp.md、Web 界面是 web.md；先按这个名字试读，读不到才走下一行） |
+| 某语言或某个界面栈的语义：机制与陷阱 | `references/lang/<栈名全小写>.md`（如 Rust 是 rust.md、C++ 是 cpp.md、Web 界面是 web.md。**先把叫法归一**：js→javascript、ts→typescript、node→javascript、golang→go、sh／shell→bash、py→python、rs→rust、react／vue／css→web；归一后读不到，才走下一行） |
 | 为一个还没有清单的栈现场推导清单 | `references/lang/method.md` |
 | 失败路径的设计：重试、超时、恢复、回滚 | `references/robustness.md` |
 | 性能：代价随规模放大、往返、争用 | `references/performance.md` |
@@ -47,7 +47,7 @@ metadata:
 | 运维面：可观测性、告警、回退、权限 | `references/operability.md` |
 | 文档 / 配置 / 契约 / 数据 / 依赖的事实与一致性 | `references/docs-config.md` |
 | 方案与意见的取舍裁决 | `references/style.md` |
-| 对象或用户指定了某套外观规格（主题、设计规范）：代码有没有绕开它 | `references/theme/<规格名全小写>.md`（先按这个名字试读；**没有声明就不读**，判据见 `references/theme/method.md`） |
+| 对象或用户指定了某套外观规格（主题、设计规范）：代码有没有绕开它 | `references/theme/<规格名全小写>.md`（「声明」指项目文件里写明了这套规格的名字或版本，不是你的印象；**拿不准就先读 `references/theme/method.md` 的探测顺序**，它判完再决定加载哪一份；没有声明就不读） |
 | 已有结论的溯源与证伪 | `references/reasoning.md` |
 
 阶段件（可选一个，不默认加载）：

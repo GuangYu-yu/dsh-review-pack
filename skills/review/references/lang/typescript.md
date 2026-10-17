@@ -85,7 +85,7 @@
 
 - `strict` 是一组开关的预设，但 `noUncheckedIndexedAccess` 与 `exactOptionalPropertyTypes` **不在其中**，须单独开启：未开启时 `arr[i]` 的类型是元素类型而不是 `元素类型 | undefined`，`obj.optional` 允许显式赋 `undefined`。不报：已显式开启这两个标志
 - `skipLibCheck` 开启时跳过 `.d.ts` 的类型检查：三方声明里的类型错误被忽略，消费方可能基于错误声明通过编译。不报：依赖的 `.d.ts` 已单独验证，或该开关关闭
-- `target` 决定降级后的运行时语义：`ES5` 下 `class` 降级为函数构造器、`const enum` 可内联、生成器改写为状态机——同一段代码在不同 `target` 下运行时行为不同。不报：`target` 与部署运行时一致，且已文档声明
+- `target` 决定降级后的运行时语义：`ES5` 下 `class` 降级为函数构造器（**版本边界**：`target: es5` 在 TS 6.0 起标为弃用、7.0 移除，按你那版 tsc 先确认它还收不收——旧版迁移过来的项目才见得到这个语义）、`const enum` 可内联、生成器改写为状态机——同一段代码在不同 `target` 下运行时行为不同。不报：`target` 与部署运行时一致，且已文档声明
 - `moduleResolution` 影响类型解析路径：`node` 与 `node16`/`nodenext` 对 `exports` 字段、`.js`/`.ts` 扩展名的处理不同，同一导入在一个设置下解析成功、另一个失败。不报：`module` 与 `moduleResolution` 已按目标运行时的严格解析规则配置
 - `esModuleInterop` 开启时允许 `import x from` 导入 CJS 模块，关闭时报错；开启后生成的 helper 在运行时的 `default` 语义与 CJS 的 `module.exports` 不同。不报：导入方已文档声明按该语义使用
 
@@ -97,7 +97,7 @@
 
 ## 官方契约的常咬点（不保证覆盖）
 
-编译器**默认值**层面的咬人处——形态见 `references/lang/method.md` 的「官方契约那一层」。**每条都是 tsc 7.0.2 本机实测**（`tsc --version` 复查）；这里没写的当场查原文。**默认值随版本前移过**，从旧版迁移过来的项目会看到一批新错。
+编译器**默认值**层面的咬人处——形态见 `references/lang/method.md` 的「官方契约那一层」。**下列默认值以 tsc 7.0.2 为基准实测**（`tsc --version` 复查）；条目里带**版本边界**标记的，边界之外不适用。这里没写的当场查原文。**默认值随版本前移过**，从旧版迁移过来的项目会看到一批新错。
 
 - **`strictNullChecks` 在 7.0.2 上默认就是开的**（实测：`let s: string = null;` **不加任何开关**即报 `TS2322: Type 'null' is not assignable to type 'string'`；加 `--strictNullChecks false` 或 `--strict false` 才放行）——按"默认为关"写的代码与配置说明已经过期。不报：项目 tsconfig 里已显式写死并文档声明
 - **`noImplicitOverride` 不在 `strict` 里**（实测：`--strict` 下覆写基类方法不报，加 `--noImplicitOverride` 才报 `TS4114: This member must have an 'override' modifier`）——以为"开了 strict 就都查了"会漏掉改名后静默不再覆写的情形。不报：项目未使用继承，或该开关已单独开启
