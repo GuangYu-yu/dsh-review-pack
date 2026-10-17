@@ -267,9 +267,19 @@ export function scanText(reportPath, text) {
       const cmp = rankLevel(cell(p, 1)) - rankLevel(cell(q, 1)) || rankEv(cell(p, 2)) - rankEv(cell(q, 2));
       if (cmp > 0) fail(q.line, `#${q.cells[0]} 排在 #${p.cells[0]} 之后，但更轻（顺序：级别 → 依据 → 位置）`);
       if (cmp === 0) {
-        const pl = Number(/:\s*(\d+)/.exec(cell(p, 3))?.[1] ?? /-(\d+)/.exec(cell(p, 3))?.[1] ?? 0);
-        const ql = Number(/:\s*(\d+)/.exec(cell(q, 3))?.[1] ?? /-(\d+)/.exec(cell(q, 3))?.[1] ?? 0);
-        if (pl > ql) fail(q.line, `#${q.cells[0]} 与 #${p.cells[0]} 同级同依据，但位置更靠前`);
+        // 位置是「文件:行」，文件之间的先后按路径比、同一个文件内才按行号比。
+        // 只比行号会把 src/table/foo.rs:20 判成该排在 src/cmd/bar.rs:900 之后——
+        // 跨文件的行号本来就没有可比性。
+        const splitPos = (s) => {
+          const t = s.replace(/[\`]/g, '').trim();
+          const k = t.lastIndexOf(':');
+          return k === -1 ? [t, 0] : [t.slice(0, k), Number(t.slice(k + 1).replace(/[^0-9].*$/, '')) || 0];
+        };
+        const [pf, pl] = splitPos(cell(p, 3));
+        const [qf, ql] = splitPos(cell(q, 3));
+        if (pf < qf) { /* 文件先后正确 */ }
+        else if (pf > qf) fail(q.line, `#${q.cells[0]} 与 #${p.cells[0]} 同级同依据，但位置更靠前`);
+        else if (pl > ql) fail(q.line, `#${q.cells[0]} 与 #${p.cells[0]} 同级同依据，但位置更靠前`);
       }
     }
 
