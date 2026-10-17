@@ -234,9 +234,10 @@ export function scanText(reportPath, text) {
     }
     // 有发现时决策点段不能空：至少要有 C 表，或一行兜底句。
     const cwin = sectionLines(1);
-    const hasFallback = cwin.some((l) => l.trim() === '零散问题，逐个修' || l.trim() === '无');
+    const hasFallback =
+      cwin.some((l) => l.trim() === '零散问题，逐个修' || l.trim() === '无') || /零散[：:]/.test(text);
     if (C === null && !hasFallback) {
-      fail(decisionStart + 2, `A 表有 ${A.rows.length} 条，决策点段却空着——至少写 C 表，或一行「零散问题，逐个修」／「无」`);
+      fail(decisionStart + 2, `A 表有 ${A.rows.length} 条，决策点段却空着——至少写 C 表，或一行「零散：#1 #2」／「无」`);
     }
   }
 
@@ -386,37 +387,42 @@ export function scanText(reportPath, text) {
     }
   }
 
-  // ---- 合并表态：同一个文件里的多条，要么合，要么说清为什么不 ----
-  const fileOf = (s) => {
-    const m = /`?([A-Za-z0-9_./\\-]+\.[A-Za-z0-9]+):\d+/.exec(s || '');
-    return m ? m[1] : null;
-  };
-  const byFile = new Map();
-  for (const r of aRows) {
-    const f = fileOf(cell(r, 3));
-    if (f === null) continue;
-    if (!byFile.has(f)) byFile.set(f, []);
-    byFile.get(f).push(cell(r, 0));
-  }
-  const grouped = new Map();
+  // ---- 每条 A 表条目要么归进某个决策点，要么进「零散」：恰好一次 ----
+  // 这是对报告自己编号的分区检查，判的是事实（有没有漏、有没有重复），不是判断对错。
+  const held = new Set();
   for (const r of cRows) {
-    for (const h of new Set((cell(r, 4).match(/#\d+/g) || []).map((x) => x.slice(1)))) {
-      const row = aRows.find((x) => cell(x, 0) === h);
-      const f = row ? fileOf(cell(row, 3)) : null;
-      if (f === null) continue;
-      if (!grouped.has(f)) grouped.set(f, new Set());
-      grouped.get(f).add(h);
-    }
+    for (const h of cell(r, 4).match(/#\d+/g) || []) held.add(h.slice(1));
   }
   const allLines = text.split('\n').map((l) => l.trim());
-  for (const [f, ids] of byFile) {
-    if (ids.length < 2) continue;
-    if ((grouped.get(f) || new Set()).size >= 2) continue;
-    if (allLines.some((l) => l.includes('未合并') && l.includes(f))) continue;
-    fail(
-      A.start,
-      `A 表里 #${ids.join(' #')} 都在 ${f}，C 表没把它们放在一起，也没有一行「未合并 ${f}：<为什么它们不相干>」`,
-    );
+  const scattered = new Set();
+  let sawScattered = false;
+  for (const l of allLines) {
+    const m = /零散[：:]\s*([#\d\s无]*)/.exec(l);
+    if (m === null) continue;
+    sawScattered = true;
+    for (const h of m[1].match(/#\d+/g) || []) scattered.add(h.slice(1));
+  }
+  if (aRows.length > 0) {
+    const ids = aRows.map((r) => cell(r, 0));
+    const both = ids.filter((id) => held.has(id) && scattered.has(id));
+    const neither = ids.filter((id) => !held.has(id) && !scattered.has(id));
+    const ghost = [...scattered].filter((id) => !ids.includes(id));
+    if (both.length > 0) {
+      fail(A.start, `#${both.join(' #')} 既挂在决策点上又列进「零散」——一条发现只能归一处`);
+    }
+    if (ghost.length > 0) {
+      fail(A.start, `「零散」里写了 #${ghost.join(' #')}，A 表里没有这一条`);
+    }
+    if (neither.length > 0 && !sawScattered) {
+      fail(
+        A.start,
+        `#${neither.join(' #')} 既没挂到决策点上，也没有一行「零散：#${neither.join(' #')}」——` +
+          '每个编号都要交代：合进去了，还是零散',
+      );
+    }
+    if (neither.length > 0 && sawScattered) {
+      fail(A.start, `#${neither.join(' #')} 没有出现在任何决策点，也没列进「零散」——漏了一条`);
+    }
   }
 
   // ---- D 表 ----
