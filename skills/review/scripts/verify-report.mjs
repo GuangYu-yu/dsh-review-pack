@@ -111,13 +111,14 @@ export function scanText(reportPath, text) {
   else {
     if (!quote[1].text.includes('范围')) fail(quote[1].line, '提要第二行缺「范围」');
     if (!quote[1].text.includes('未查')) fail(quote[1].line, '提要第二行缺「未查」——"未查"写在这里，不是文末');
-    // 第一行写的是**对象的状态**，不是合并许可。合并只是审查的一种用途。
-    const head = quote[0].text.replace(/^\s*>\s*/, '');
-    const stateRe = /^\*\*(先修|可以先用|先验证)\*\*\s*——\s*\S/;
-    if (/能合|不能合|可合|不可合/.test(head)) {
-      fail(quote[0].line, '提要第一行写的是对象状态（`先修`／`可以先用`／`先验证`），不是合并许可——审的是这份东西，不是审批流程');
-    } else if (!stateRe.test(head)) {
-      fail(quote[0].line, '提要第一行应是 `**<先修 ／ 可以先用 ／ 先验证>** —— <最要紧的那条会造成什么>`');
+    // 第一行是**一句话**：说清最要紧的问题与后果。不加标签、不加粗、不用审批词——
+    // 读者从零开始读，他要听的是事，不是档案编号。
+    const head = quote[0].text.replace(/^\s*>\s*/, '').trim();
+    const labelled = /^\*\*/.test(head) || /^(先修|可以先用|先验证)\b/.test(head);
+    if (labelled || /能合|不能合|可合|不可合|放行/.test(head)) {
+      fail(quote[0].line, '提要第一行直接说事：不加粗、不套「能合／不能合／放行」或「先修／可以先用／先验证」这类标签');
+    } else if (head.length < 8 || !/[。！？][”’"'）)]*$/.test(head)) {
+      fail(quote[0].line, '提要第一行应是一句话（完整、以句号收尾），不是标签或短语');
     }
   }
   notes.push('提要');
