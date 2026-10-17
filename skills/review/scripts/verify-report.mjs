@@ -386,6 +386,39 @@ export function scanText(reportPath, text) {
     }
   }
 
+  // ---- 合并表态：同一个文件里的多条，要么合，要么说清为什么不 ----
+  const fileOf = (s) => {
+    const m = /`?([A-Za-z0-9_./\\-]+\.[A-Za-z0-9]+):\d+/.exec(s || '');
+    return m ? m[1] : null;
+  };
+  const byFile = new Map();
+  for (const r of aRows) {
+    const f = fileOf(cell(r, 3));
+    if (f === null) continue;
+    if (!byFile.has(f)) byFile.set(f, []);
+    byFile.get(f).push(cell(r, 0));
+  }
+  const grouped = new Map();
+  for (const r of cRows) {
+    for (const h of new Set((cell(r, 4).match(/#\d+/g) || []).map((x) => x.slice(1)))) {
+      const row = aRows.find((x) => cell(x, 0) === h);
+      const f = row ? fileOf(cell(row, 3)) : null;
+      if (f === null) continue;
+      if (!grouped.has(f)) grouped.set(f, new Set());
+      grouped.get(f).add(h);
+    }
+  }
+  const allLines = text.split('\n').map((l) => l.trim());
+  for (const [f, ids] of byFile) {
+    if (ids.length < 2) continue;
+    if ((grouped.get(f) || new Set()).size >= 2) continue;
+    if (allLines.some((l) => l.includes('未合并') && l.includes(f))) continue;
+    fail(
+      A.start,
+      `A 表里 #${ids.join(' #')} 都在 ${f}，C 表没把它们放在一起，也没有一行「未合并 ${f}：<为什么它们不相干>」`,
+    );
+  }
+
   // ---- D 表 ----
   if (D === null) fail(stopStart + 2, '缺 D 表（停止审查的依据，一行一册）');
   else {
