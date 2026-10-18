@@ -519,7 +519,10 @@ export function scanText(reportPath, text) {
     if (emoji.test(vis[i])) fail(i + 1, '出现了图标或 emoji');
   }
   for (let i = 0; i < vis.length; i++) {
-    if (/<\/?(details|summary|div|span|br|img|table|style)\b/i.test(vis[i])) fail(i + 1, '不许写 HTML（折叠块、内联样式都算）');
+    // 只认「像 HTML 标签」的：闭合标签，或后面不跟着冒号的开标签。
+    // `<img>:1`、`<table>:5` 这类是占位符（磁盘镜像、表名），不是折叠块也不是内联样式。
+    const htmlTag = /<(details|summary|div|span|br|img|table|style)(\s[^>]*)?>(?!:)|<\/(details|summary|div|span|br|img|table|style)>/i;
+    if (htmlTag.test(vis[i])) fail(i + 1, '不许写 HTML（折叠块、内联样式都算）');
     // 只报「含中文或含 …」的尖括号：`Vec<u8>`、`Option<T>` 是代码，不是没填的槽位。
     for (const m of vis[i].matchAll(/<([^<>\n]{1,60})>/g)) {
       if (m[0].startsWith('<http')) continue;
