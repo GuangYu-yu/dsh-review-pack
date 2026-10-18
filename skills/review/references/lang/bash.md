@@ -99,7 +99,7 @@
 
 ## 循环与迭代
 
-- `while read -r line; do ...; done < file` 里 **`-r` 恰恰会关掉续行**：默认模式下 `<反斜杠><换行>` 被当作续行（两行并作一行读入），加了 `-r` 之后反斜杠不再特殊，**每一行就是一行**（POSIX `read`：`-r` "Do not treat a `<backslash>` character in any special way"）。同一段代码在别处若**没加** `-r`，遇到以反斜杠结尾的行就会把两行粘成一条。不报：输入来自机器生成、已保证行尾无反斜杠
+- `while read -r line; do ...; done < file` 里 **`-r` 恰恰会关掉续行**：默认模式下「反斜杠＋换行」被当作续行（两行并作一行读入），加了 `-r` 之后反斜杠不再特殊，**每一行就是一行**（POSIX `read`：`-r` "Do not treat a backslash character in any special way"）。同一段代码在别处若**没加** `-r`，遇到以反斜杠结尾的行就会把两行粘成一条。不报：输入来自机器生成、已保证行尾无反斜杠
 - `for f in *` 在目录为空时展开为字面量 `*`，循环执行一次（Bash 5.3 实测：`GOT=/tmp/.../*`）。不报：已用 `shopt -s nullglob` 或已检查展开结果
 
 ## 官方契约的常咬点（不保证覆盖）
