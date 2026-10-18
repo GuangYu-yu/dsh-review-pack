@@ -523,12 +523,10 @@ export function scanText(reportPath, text) {
     // `<img>:1`、`<table>:5` 这类是占位符（磁盘镜像、表名），不是折叠块也不是内联样式。
     const htmlTag = /<(details|summary|div|span|br|img|table|style)(\s[^>]*)?>(?!:)|<\/(details|summary|div|span|br|img|table|style)>/i;
     if (htmlTag.test(vis[i])) fail(i + 1, '不许写 HTML（折叠块、内联样式都算）');
-    // 只报「含中文或含 …」的尖括号：`Vec<u8>`、`Option<T>` 是代码，不是没填的槽位。
-    for (const m of vis[i].matchAll(/<([^<>\n]{1,60})>/g)) {
-      if (m[0].startsWith('<http')) continue;
-      if (/[\u4e00-\u9fff\u3000-\u303f\uff00-\uffef…]/.test(m[1])) {
-        fail(i + 1, `还有没填的尖括号槽位：${m[0]}`);
-      }
+    // 槽位只认全角尖括号 `〈…〉`：程序里的 `<T>`、`Vec<u8>`、`<img>` 与它长得不一样，
+    // 所以这里不需要"含中文才算槽位"那种猜测——一旦出现就是没填完。
+    for (const m of vis[i].matchAll(/〈[^〈〉\n]{1,60}〉/g)) {
+      fail(i + 1, `还有没填的槽位：${m[0]}`);
     }
   }
 
