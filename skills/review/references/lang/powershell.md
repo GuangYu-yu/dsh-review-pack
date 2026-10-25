@@ -6,7 +6,7 @@
 
 `PSScriptAnalyzer`（`Invoke-ScriptAnalyzer`）默认跑它当前的规则集——**有哪些规则用 `Get-ScriptAnalyzerRule` 查**（规则名随版本增删，不在这里固化）。与本册边界相关的是习惯与陷阱那几类：别名与位置参数、`Invoke-Expression`、`Write-Host`、赋值到自动变量、`UseApprovedVerbs` / `UseSingularNouns`、状态改变函数的 `ShouldProcess`。
 
-`Set-StrictMode -Version Latest` 覆盖（在本机 PowerShell 7.6.3 上逐条跑过）：引用未初始化的变量、访问不存在的属性。**另：`Test-MyFn(1,2)` 报的 `called as if it were a method` 不归它管**——那是参数绑定层的错误，不设 StrictMode 也照抛（单参数 `Test-MyFn(1)` 不报）。**它不覆盖"多给位置参数"**——`Test-MyFn 1 2` 静默通过，这一条别指望它。
+`Set-StrictMode -Version Latest` 覆盖（在本机 PowerShell 7.6.3 上逐条跑过）：引用未初始化的变量、访问不存在的属性。**另：`Test-MyFn(1,2)` 报的 `called as if it were a method` 不归它管**——那是参数绑定层的错误：`-Version Latest` 下这个调用会抛，而 `-Version 1.0`（不设 StrictMode）下它不抛，而是把整对 `(1,2)` 静默绑给第一个参数（`a=1 2`、`b` 为空）。**"不抛"不等于"没错"**——静默错绑比抛错更难发现。**它不覆盖"多给位置参数"**——`Test-MyFn 1 2` 静默通过，这一条别指望它。
 
 前提是它真的跑过：CI 里没有这一步时，先自己跑一遍。
 
@@ -74,7 +74,7 @@
 - **两侧类型不同时，比较按左侧的类型来**（实测：`"10" -lt "9"` 是 `True`、`"10" -lt 9` **也是** `True`，而 `10 -lt 9` 是 `False`）——从 JSON 或参数里读来的数字是**字符串**，于是"10 小于 9"成立。不报：比较前已显式转了类型
 - **`/` 总返回 `Double`，`[int]` 转换是舍入不是截断**（实测：`7 / 2` 是 `3.5`、类型 `Double`；`[int](7 / 2)` 是 **`4`**，不是 `3`）。而且它是**银行家舍入**，不是四舍五入（实测：`[int]2.5` 是 `2`、`[int]3.5` 是 `4`）——`[int](7/2)` 得 `4` 只是恰好在两种规则重合处，用它验不出差别——整除要显式 `[math]::Truncate` 或 `[math]::Floor`；分页、分片、取中位都会偏。不报：该处本就按浮点处理
 - **`$null` 必须放在比较的左边**（实测：`$null -eq $arr` 是 `False`，是标量比较；写成 `$arr -eq $null` 返回的是**过滤后的集合**而不是布尔——空集合与 `$false` 长得不一样）。不报：被比较的确定不是集合
-- **`ConvertTo-Json` 默认 `-Depth 2`，超出的层级被替换成类型名**（实测：三层就输出 `{"a":{"b":{"c":"System.Collections.Hashtable"}}}`，本机另给一条告警）——**数据没报错，只是没了**。不报：结构确定不超两层，或已显式传 `-Depth`
+- **`ConvertTo-Json` 默认 `-Depth 2`，超出的层级被替换成类型名**（实测：三层 `@{a=@{b=@{c=1}}}` 完整输出，四层 `@{a=@{b=@{c=@{d=1}}}}` 才把最内层换成 `System.Collections.Hashtable`，本机另给一条 "exceeded the set depth of 2" 告警）——**数据没报错，只是没了**。不报：结构确定不超两层，或已显式传 `-Depth`
 - **`$null` 元素进管道会被丢弃**（实测：`@(1,$null,2).Count` 是 `3`，而 `@(1,$null,2) | Measure-Object` 的计数是 `2`）——按数组长度与按管道计数会得到两个不同的数。不报：集合内本就不含 `$null`
 
 ## 报告

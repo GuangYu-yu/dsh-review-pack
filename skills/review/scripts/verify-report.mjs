@@ -498,7 +498,7 @@ export function scanText(reportPath, text) {
   for (let i = 0; i < vis.length; i++) {
     if (/^校验\s/.test(vis[i].trim())) { checkIdx = i; break; }
   }
-  const checkRe = /^校验\s*(?:通过|未通过：.+|未跑：.+)$/;
+  const checkRe = /^校验\s*(?:通过|未通过：.+|未跑：.+)(?:（[^）]*）)?$/;
   if (checkIdx === -1) {
     fail(last?.line ?? null, '没有 `校验` 行——不写等于隐瞒');
   } else {
