@@ -146,9 +146,9 @@ function resolveFile(root, rel, walkCache) {
 
   const needle = rel.replace(/\\/g, '/');
   const hits = walkFiles(root, walkCache).filter((abs) => abs.replace(/\\/g, '/').endsWith('/' + needle));
-  if (hits.length === 0) return { abs: null, how: 'missing' };
+  if (hits.length === 0) return { abs: null, how: 'missing', hits };
   hits.sort((a, b) => a.length - b.length);
-  return { abs: hits[0], how: 'suffix' };
+  return { abs: hits[0], how: 'suffix', hits };
 }
 
 const CJK = /[\u3400-\u9FFF\uF900-\uFAFF]/;const STATEMENT = /^(if|else|for|while|return|let|fn|pub|impl|struct|enum|match|use|mod|const|static|type|loop|await)\b/;
@@ -250,6 +250,13 @@ export function verify(text, { file = '<input>', root = process.cwd(), window = 
     }
     if (resolved.how === 'suffix') {
       notes.push({ file, line: target.line, msg: `${anchor.path} 按后缀解析到 ${path.relative(root, resolved.abs)}` });
+      if (resolved.hits.length > 1) {
+        notes.push({
+          file,
+          line: target.line,
+          msg: `${anchor.path} 有 ${resolved.hits.length} 份同名文件，按后缀取最短的一份（${path.relative(root, resolved.abs)}）——请把路径补全，否则可能核到另一个文件`,
+        });
+      }
     }
 
     let lines;

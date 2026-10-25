@@ -436,8 +436,13 @@ export function scanText(reportPath, text) {
       if (verdict.startsWith('未加载') && !verdict.includes('：')) fail(r.line, '「未加载」后面要跟理由（`未加载：<为什么这个对象用不到它>`）');
       if (basis === '') fail(r.line, `D 表「${ref}」的判据空着——数得出来的才算走过`);
     }
+    const refs = new Set(dRows.map((r) => r.cells[0]));
+    const has = (s) => [...refs].some((x) => x.includes(s));
+    if (!has('adversarial.md')) notes.push('D 表没列 references/adversarial.md（代码与变更集的必载）');
+    if (!has('code.md') && !has('diff.md')) notes.push('D 表没列 references/code.md 或 references/diff.md（按对象必载其一）');
+    if (![...refs].some((x) => x.includes('/lang/'))) notes.push('D 表没列语言清单（认得出技术栈就必须列）');
   }
-  notes.push('三张表');
+  notes.push('各表');
 
   // ---- 账本与用量行 ----
   const ledgerIdx = vis.findIndex((l) => /^账本\s/.test(l));
