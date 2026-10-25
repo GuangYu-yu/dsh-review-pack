@@ -468,6 +468,25 @@ export function scanText(reportPath, text) {
       } else if (Number(rest[1]) + k !== ledgerTotal) {
         fail(ledgerIdx + 1, `账本 ${ledgerTotal} 条、上表 ${k} 条、另 ${rest[1]} 条——三个数对不上，读者不该替你做减法`);
       }
+      // 数字对得上不等于条目对得上：A 表每条指的位置，账本里要有同一处。
+      // 只认「路径:行号」这一种锚点，认不出锚点的行跳过——认不出不是错，是这一行没写位置。
+      const target = candidates.find((q) => existsSync(q));
+      const posCol = A === null ? -1 : A.header.indexOf('位置');
+      if (target !== undefined && posCol >= 0) {
+        const ledgerText = readFileSync(target, 'utf8').replace(/\\/g, '/');
+        const missing = [];
+        for (const r of A.rows) {
+          const anchor = /([A-Za-z0-9_./-]+\.[A-Za-z0-9]+):(\d+)/.exec(String(r.cells[posCol] ?? '').replace(/\\/g, '/'));
+          if (anchor === null) continue;
+          if (!ledgerText.includes(`${anchor[1]}:${anchor[2]}`)) missing.push(`${anchor[1]}:${anchor[2]}`);
+        }
+        if (missing.length > 0) {
+          fail(
+            ledgerIdx + 1,
+            `A 表这 ${missing.length} 条的位置在账本里找不到：${missing.slice(0, 4).join('、')}——报告与账本要能逐条对上，对不上的补进账本或从 A 表撤下`,
+          );
+        }
+      }
     }
   }
 
