@@ -187,8 +187,14 @@ export function readRow(row, push, columnsExpected = COLUMNS) {
     if (out[key] === '' || out[key] === '-') push(`${label}这一列不能空`);
   }
 
-  if (out.level === '严重' && !HARD_BASES.includes(out.basis)) {
-    push('「严重」要有独立依据（跑了命令或引了原文）；这一条的依据是「' + out.basis + '」');
+  // 「把失败静默当成成功」是唯一的例外：仪器可以是两处代码路径的对照，
+  // 两处都要指到具体行（`独立依据：两处代码路径对照 <a:12> 与 <b:34>`），只指一处不算。
+  const whole = row.cells.join('|');
+  const pair =
+    /独立依据：\s*两处代码路径对照[^|]*?[A-Za-z0-9_./\\-]+\.[A-Za-z0-9]+:\d+[^|]*?与[^|]*?[A-Za-z0-9_./\\-]+\.[A-Za-z0-9]+:\d+/.test(whole);
+
+  if (out.level === '严重' && !HARD_BASES.includes(out.basis) && !pair) {
+    push('「严重」要有独立依据（跑了命令或引了原文；「把失败静默当成成功」可用「独立依据：两处代码路径对照 <a:行> 与 <b:行>」）；这一条的依据是「' + out.basis + '」');
   }
   if (out.retract === '无') {
     push('撤回条件写「无」，等于说这条不可证伪；写清什么情况会让它不成立');
