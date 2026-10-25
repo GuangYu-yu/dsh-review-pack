@@ -526,7 +526,7 @@ export function scanText(reportPath, text) {
     // 槽位只认全角尖括号 `〈…〉`：程序里的 `<T>`、`Vec<u8>`、`<img>` 与它长得不一样，
     // 所以这里不需要"含中文才算槽位"那种猜测——一旦出现就是没填完。
     for (const m of vis[i].matchAll(/〈[^〈〉\n]{1,60}〉/g)) {
-      fail(i + 1, `还有没填的槽位：${m[0]}`);
+      fail(i + 1, `还有没填的槽位：${m[0]}（这是模板标记，交付前换成实际值）`);
     }
   }
 

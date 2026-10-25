@@ -1,6 +1,6 @@
 # dsh-review-pack
 
-一个"审一切待交付的东西"的评审技能包：**一个入口技能 + 18 个分册 + 两组按需增长的清单（`references/lang/` 按栈、`references/theme/` 按外观规格）**。
+一个"审一切待交付的东西"的评审技能包：**一个入口技能 + 19 个分册 + 两组按需增长的清单（`references/lang/` 按栈、`references/theme/` 按外观规格）**。
 
 技能本体与宿主无关——`skills/` 下就是普通的 `SKILL.md` 技能集，正文只用 `git` 与通用命令，不调用任何宿主专有工具或服务。任何能读 `SKILL.md` 的宿主都能装；`cordis.patch.yml` 只是给 DSH 的可选装配层，别的宿主忽略它即可。
 
@@ -20,7 +20,7 @@
 <技能根>/
 └── review/
     ├── SKILL.md          入口件
-    └── references/       18 个分册 + lang/（按栈）+ theme/（按外观规格）
+    └── references/       19 个分册 + lang/（按栈）+ theme/（按外观规格）
 ```
 
 
@@ -32,7 +32,7 @@ pnpm dsh plugin --profile <profile> add <本目录或 .tgz 路径>
 
 ## `skills/` 里有什么
 
-`review/SKILL.md` 是入口件，只做两件事：**说清分册在哪**，以及**按对象把活分派出去**。它每次评审都会加载，所以刻意写得很薄；判定与交付的规则在 `review/references/contract.md`（**每次都读**），其余按需读 `review/references/` 下的 18 个分册（外加 `lang/method.md`）：
+`review/SKILL.md` 是入口件，只做两件事：**说清分册在哪**，以及**按对象把活分派出去**。它每次评审都会加载，所以刻意写得很薄；判定与交付的规则在 `review/references/contract.md`（**每次都读**），其余按需读 `review/references/` 下的 19 个分册（外加 `lang/method.md`）：
 
 | 分册 | 对象 |
 | --- | --- |
@@ -41,9 +41,9 @@ pnpm dsh plugin --profile <profile> add <本目录或 .tgz 路径>
 | `lang` / `robustness` / `performance` / `security` | 语言写法推导 / 失败路径 / 性能 / 安全 |
 | `adversarial` / `verification` | 正确性对抗推理 / 验证本身 |
 | `operability` / `docs-config` / `style` / `reasoning` | 运维面 / 文档与配置 / 方案取舍 / 已有结论 |
-| `derive` / `discipline` / `intake` | 阶段件：评审开场 / 写改代码与交付前 / 没有现成改动可审时怎么取输入 |
+| `derive` / `discipline` / `intake` / `state-space` | 阶段件：评审开场 / 写改代码与交付前 / 没有现成改动可审时怎么取输入 / 要一张状态地图 |
 
-`references/` 顶层是 18 个**有界**分册，另有两个**按需增长**的清单目录：**`references/lang/`**（按技术栈分——语言、界面栈各一册）与 **`references/theme/`**（按外观规格分）；两处各有一个 `method.md` 讲这个目录的颗粒度，它本身也是一册。**文件名就是名字的小写**（`C++` → `cpp.md`、Web 界面 → `web.md`）：**加一个栈只在 `lang/` 里放一个文件，入口与分发表一处都不用改**；`theme/` 的每一册**只在项目声明了那套规格时才加载**，没有声明就不判。清单文件开头必须写「状态」行——那是它被认出来的唯一依据：`references/lang/` 下的文件要么带「状态」行，要么只能是那个方法件，**这条有机器检查兜底**。
+`references/` 顶层是 19 个**有界**分册，另有两个**按需增长**的清单目录：**`references/lang/`**（按技术栈分——语言、界面栈各一册）与 **`references/theme/`**（按外观规格分）；两处各有一个 `method.md` 讲这个目录的颗粒度，它本身也是一册。**文件名就是名字的小写**（`C++` → `cpp.md`、Web 界面 → `web.md`）：**加一个栈只在 `lang/` 里放一个文件，入口与分发表一处都不用改**；`theme/` 的每一册**只在项目声明了那套规格时才加载**，没有声明就不判。清单文件开头必须写「状态」行——那是它被认出来的唯一依据：`references/lang/` 下的文件要么带「状态」行，要么只能是那个方法件，**这条有机器检查兜底**。
 
 **`scripts/` 下只有一个自查器**：`verify-report.mjs`。报告写完后跑 `node scripts/verify-report.mjs <报告文件>`，它只查能机械判真假的东西——块序、两张表同号同条数、用量行自己报的数、账本行的减法、依据与级别的用词、标「严重」有没有独立依据——**不判断一条发现对不对**，也不读被审对象。它零依赖、只用 node 内建，宿主有 node 就能跑；没有就写「校验 未跑」并说明原因，不写等于隐瞒。**它是要求不是机制**：跑不跑由评审者决定，这份包无法核实。
 

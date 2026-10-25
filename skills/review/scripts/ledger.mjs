@@ -163,14 +163,19 @@ export function readRow(row, push, columnsExpected = COLUMNS) {
   out.basis = basis;
   out.confidence = confidence;
 
-  const anchor = ANCHOR.exec(out.loc);
-  if (anchor === null) {
-    push(`位置必须带 \`文件:行号\`，实际是「${out.loc}」`);
+  // 槽位（`〈…〉`）是模板标记：账本是要交的，位置里留着它说明模板没填完。
+  if (/〈[^〈〉\n]{1,60}〉/.test(out.loc)) {
+    push(`位置里还有没填的槽位（模板不是交付物）：${out.loc}`);
   } else {
-    out.locPath = anchor[1];
-    out.locFrom = Number(anchor[2]);
-    out.locTo = anchor[3] === undefined ? Number(anchor[2]) : Number(anchor[3]);
-    if (out.locTo < out.locFrom) push(`位置的行号范围反了：${out.locPath}:${out.locFrom}-${out.locTo}`);
+    const anchor = ANCHOR.exec(out.loc);
+    if (anchor === null) {
+      push(`位置必须带 \`文件:行号\`，实际是「${out.loc}」`);
+    } else {
+      out.locPath = anchor[1];
+      out.locFrom = Number(anchor[2]);
+      out.locTo = anchor[3] === undefined ? Number(anchor[2]) : Number(anchor[3]);
+      if (out.locTo < out.locFrom) push(`位置的行号范围反了：${out.locPath}:${out.locFrom}-${out.locTo}`);
+    }
   }
 
   for (const [key, label] of [

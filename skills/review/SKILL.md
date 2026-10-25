@@ -24,7 +24,7 @@ metadata:
 
 1. **每条结论挂依据**：读源码 / 跑了命令 / 引了原文 / 推断，四者之一。
 2. **定级不得高于依据。**
-3. **报告固定三段**：发现的问题 / 决策点 / 停止审查的依据。
+3. **报告固定三段**：发现的问题 / 决策点 / 停止审查的依据。产出是状态地图时按 `references/state-space.md` 的七节交付，依据与定级不变。
 
 **报告的外形**（两张表、展开、长度、不许出现的东西）见 `references/format.md`——它是上面第 2 个必读件，不是"写报告时才翻"的可选项。
 
@@ -58,8 +58,9 @@ metadata:
 | 评审开场：先冻结问题边界，再推该审什么 | `references/derive.md` |
 | 写代码 / 改代码 / 交付前 | `references/discipline.md` |
 | 没有现成的改动可审，要自己取输入 | `references/intake.md` |
+| 要一张状态地图（哪些组合可构造但语义不成立、该收敛哪几个维度），而不是发现清单 | `references/state-space.md` |
 
-选件顺序：先按对象选一个。对象不明确时默认 `references/code.md`。**"没有改动可审"这一种情形要看两件事**：手上没有输入（没给 diff、没给文件）→ `references/intake.md`，先取输入；输入就是"我说我改好了"这一类自述、没有可看的改动 → `references/discipline.md`。两者是先后关系，不是二选一：intake 取不到输入才落到 discipline。
+选件顺序：先按对象选一个。对象不明确时默认 `references/code.md`。**"没有改动可审"这一种情形分三路**：要你去取输入、或手上确实没有 diff 与文件 → `references/intake.md`，先取输入；问的是**该从哪查、先看什么**（"陌生项目先审哪些""没有清单"）→ `references/derive.md`，先冻结边界再推该审什么；输入只是"我说我改好了"这一类自述、没有可看的改动 → `references/discipline.md`。三者是先后关系：derive 定范围、intake 取不到输入、discipline 收尾。
 
 **分册会自己带路。** 命中的那一册在自己的头部声明它还要带谁（例如代码与变更集对象要求 `references/adversarial.md` 必载，动了不可逆状态就再叠 `references/verification.md`），照它说的叠。**入口只管第一次分发**，所以加规则时加到需要它的那一册里，由那一册自己声明——入口不必再动。
 

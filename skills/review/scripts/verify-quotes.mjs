@@ -67,8 +67,11 @@ export function collect(text, file = '<input>') {
     if (line === '') continue;
 
     const cells = line.startsWith('|') ? splitRow(raw) : [line];
+    // 槽位是模板标记，不是引用：含 `〈…〉` 的单元格整格跳过——既不算锚点，也不算引文。
+    const usable = cells.filter((c) => !c.includes('〈'));
+    if (usable.length === 0) continue;
     const anchors = [];
-    for (const cell of cells) {
+    for (const cell of usable) {
       for (const m of cell.matchAll(ANCHOR)) {
         anchors.push({ path: m[1], from: Number(m[2]), to: m[3] === undefined ? Number(m[2]) : Number(m[3]) });
       }
@@ -76,11 +79,12 @@ export function collect(text, file = '<input>') {
     if (anchors.length === 0) continue;
 
     const quotes = [];
-    for (const cell of cells) {
+    for (const cell of usable) {
       for (const m of cell.matchAll(BACKTICK)) {
         const span = m[1].trim();
         if (span.length < 6) continue;
         if (VOCAB.has(span)) continue;
+        if (span.includes('〈')) continue; // 槽位模板，不是原文
         if (/^[A-Za-z0-9_./\\-]+\.[A-Za-z0-9]+:\d+/.test(span)) continue; // 本身就是位置
         if (!CODEISH.test(span) && !IDENT.test(span)) continue;
         if (EMOJI.test(span)) continue;
