@@ -171,7 +171,21 @@ export function scanText(reportPath, text) {
   const coverTables = pick(COVER_HEAD);
 
   const unknown = tables.filter((t) => ![A_HEAD, B_HEAD, C_HEAD, D_HEAD, COVER_HEAD].some((h) => same(t.header, h)));
-  for (const t of unknown) fail(t.start, `表头不认识（${t.header.join(' | ')}）——列名按本件，不许省、不许改`);
+  for (const t of unknown) {
+    const heads = [A_HEAD, B_HEAD, C_HEAD, D_HEAD, COVER_HEAD];
+    const best = heads
+      .map((h) => ({ h, hit: h.filter((x) => t.header.includes(x)).length }))
+      .sort((a, b) => b.hit - a.hit)[0];
+    const miss = best.h.filter((x) => !t.header.includes(x));
+    const extra = t.header.filter((x) => !best.h.includes(x));
+    const parts = [];
+    if (miss.length > 0) parts.push(`缺 ${miss.map((x) => `「${x}」`).join('、')}`);
+    if (extra.length > 0) parts.push(`多 ${extra.map((x) => `「${x}」`).join('、')}`);
+    fail(
+      t.start,
+      `表头不认识（${t.header.join(' | ')}）——最接近「${best.h.join(' | ')}」：${parts.join('；') || '列名与它不同'}；列名不许省、不许改`,
+    );
+  }
 
   if (aTables.length > 1) for (const t of aTables.slice(1)) fail(t.start, 'A 表只能有一张');
   if (bTables.length > 1) for (const t of bTables.slice(1)) fail(t.start, 'B 表只能有一张');
@@ -266,7 +280,7 @@ export function scanText(reportPath, text) {
       const p = aRows[i - 1];
       const q = aRows[i];
       const cmp = rankLevel(cell(p, 1)) - rankLevel(cell(q, 1)) || rankEv(cell(p, 2)) - rankEv(cell(q, 2));
-      if (cmp > 0) fail(q.line, `#${q.cells[0]} 排在 #${p.cells[0]} 之后，但更轻（顺序：级别 → 依据 → 位置）`);
+      if (cmp > 0) notes.push(`第 ${q.line} 行：#${q.cells[0]} 排在 #${p.cells[0]} 之后但更轻（习惯顺序：级别 → 依据 → 位置），读者会先看到轻的`);
       if (cmp === 0) {
         // 位置是「文件:行」，文件之间的先后按路径比、同一个文件内才按行号比。
         // 只比行号会把 src/table/foo.rs:20 判成该排在 src/cmd/bar.rs:900 之后——
@@ -279,8 +293,7 @@ export function scanText(reportPath, text) {
         const [pf, pl] = splitPos(cell(p, 3));
         const [qf, ql] = splitPos(cell(q, 3));
         if (pf < qf) { /* 文件先后正确 */ }
-        else if (pf > qf) fail(q.line, `#${q.cells[0]} 与 #${p.cells[0]} 同级同依据，但位置更靠前`);
-        else if (pl > ql) fail(q.line, `#${q.cells[0]} 与 #${p.cells[0]} 同级同依据，但位置更靠前`);
+        else if (pf > qf || pl > ql) notes.push(`第 ${q.line} 行：#${q.cells[0]} 与 #${p.cells[0]} 同级同依据，但位置更靠前（习惯按文件路径、再按行号排）`);
       }
     }
 
@@ -620,7 +633,8 @@ export function scanText(reportPath, text) {
   // ---- 禁句 ----
   // 只查表格数据行、提要行与收尾行；围栏代码块与行内代码里的字样不算（那可能是元讨论或输出）。
   const bannedLines = [];
-  for (const t of tables) for (const r of t.rows) bannedLines.push({ line: r.line, text: r.cells.join(' | ') });
+  const softBanned = [];
+  for (const t of tables) for (const r of t.rows) softBanned.push({ line: r.line, text: r.cells.join(' | ') });
   for (const q of quote) bannedLines.push({ line: q.line, text: q.text });
   const lastTableEnd = tables.reduce((mx, t) => Math.max(mx, t.endIdx), -1);
   const closeTo = prevIdx >= 0 ? prevIdx : lastIdx;
@@ -629,16 +643,25 @@ export function scanText(reportPath, text) {
     if (/^校验\s/.test(vis[i].trim())) continue;
     bannedLines.push({ line: i + 1, text: vis[i] });
   }
-  for (const cand of bannedLines) {
-    const plain = stripCode(cand.text);
+  const bannedHit = (text) => {
+    const plain = stripCode(text);
     for (const phrase of BANNED) {
       // 「能合」是「不能合」「能合并」的子串：长词先命中即跳出，且排除「能合并」这种复合词。
       const hit = phrase === '能合' ? /(?<!不)能合(?!并)/.test(plain) : plain.includes(phrase);
-      if (hit) {
-        fail(cand.line, `出现了禁句「${phrase}」——format.md §六与提要规则明令禁止（审批词、完整性命题）`);
-        break;
-      }
+      if (hit) return phrase;
     }
+    return null;
+  };
+  for (const cand of bannedLines) {
+    const phrase = bannedHit(cand.text);
+    if (phrase !== null) {
+      fail(cand.line, `出现了禁句「${phrase}」——format.md §六与提要规则明令禁止（审批词、完整性命题）`);
+    }
+  }
+  // 表格里同一批词只作提示：「不能合并到一处」「没有问题域重叠」这类句子本身是正常判据用语。
+  for (const cand of softBanned) {
+    const phrase = bannedHit(cand.text);
+    if (phrase !== null) notes.push(`第 ${cand.line} 行的表里有「${phrase}」——若是在说结论（而不是在说判据），改掉`);
   }
 
   return { problems, notes };
