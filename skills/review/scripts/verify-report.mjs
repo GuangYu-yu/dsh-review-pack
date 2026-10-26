@@ -18,7 +18,9 @@ import { pathToFileURL } from 'node:url';
 const LEVELS = ['严重', '一般', '待查'];
 const EVIDENCE = ['跑了命令', '引了原文', '读源码', '推断'];
 const CONFIDENCE = ['可证', '一环未读全', '存疑'];
-const FORMS = ['收口', '默认值'];
+// 四种结构特征是主名；`收口`／`默认值` 是前两种的旧名，旧报告仍可过。
+const FORMS = ['同一表示', '同一判据', '同一路径', '同一生命周期', '收口', '默认值'];
+const MERGE_TWO = ['同一表示', '同一判据', '收口'];
 const SECTION_NAMES = ['发现的问题', '决策点', '停止审查的依据'];
 
 const A_HEAD = ['#', '级别', '依据', '位置', '问题', '修复方向'];
@@ -410,7 +412,7 @@ export function scanText(reportPath, text) {
       const [id, form, cur, lean, held] = r.cells;
       if (!FORMS.includes(form)) fail(r.line, `决策点 #${id} 的形态「${form}」不是 ${FORMS.join('／')} 之一`);
       const heldIds = (held || '').match(/#\d+/g) || [];
-      const need = form === '收口' ? 2 : 1;
+      const need = MERGE_TWO.includes(form) ? 2 : 1;
       if (held.trim() === '' || held.trim() === '-') {
         fail(r.line, `决策点 #${id} 的「挂住的条目」空着——${form}至少要挂 ${need} 条`);
       } else if (heldIds.length < need) {
@@ -429,11 +431,11 @@ export function scanText(reportPath, text) {
 
   // ---- 「根因覆盖」：有收口时必须把 A 表编号分成"这条根因解释的"与"不解释的"两组 ----
   // 判的是自洽（分完、不重、不与自己挂住的条目矛盾），不判根因对不对。
-  const kouRows = cRows.filter((r) => cell(r, 1) === '收口');
+  const kouRows = cRows.filter((r) => MERGE_TWO.includes(cell(r, 1)));
   // 两条以上「收口」＝同一个判据被写了两遍：这是状态空间问题，不是"再多回源几条"。
   if (kouRows.length >= 2) {
     notes.push(
-      `决策点里有 ${kouRows.length} 条「收口」——这一轮已经走到状态空间门口了；按 references/state-space.md 导语的触发条件叠本册，给维度清单，才看得出同一空间里还有哪些组合也不该能构造`,
+      `决策点里有 ${kouRows.length} 条合并（同一表示／同一判据）——这一轮已经走到状态空间门口了；按 references/state-space.md 导语的触发条件叠本册，给维度清单，才看得出同一空间里还有哪些组合也不该能构造`,
     );
   }
   if (kouRows.length > 0) {
