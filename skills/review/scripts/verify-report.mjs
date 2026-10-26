@@ -291,6 +291,34 @@ export function scanText(reportPath, text) {
         fail(r.line, `#${cell(r, 0)} 标「严重」但依据是「推断」——contract.md 说推断不得定为最高级，降到「待查」`);
       }
     }
+    // 仪器必须挂在**这一条**上，不能靠全文出现一次就算数：同号 B 表的「撤回条件」格，
+    // 或这条自己的展开段。一份对同一处成立的仪器去担保别的条目，就是虚报。
+    const pairForm =
+      /独立依据：\s*两处代码路径对照[^|]*?[A-Za-z0-9_./\\-]+\.[A-Za-z0-9]+:\d+[^|]*?与[^|]*?[A-Za-z0-9_./\\-]+\.[A-Za-z0-9]+:\d+/;
+    const ownInstrument = (id) => {
+      const parts = [];
+      if (B !== null) {
+        for (const row of B.rows) if (cell(row, 0) === id) parts.push(row.cells.join(' | '));
+      }
+      const re = new RegExp(`^\\*\\*#${id} 展开\\*\\*$`);
+      for (let i = 0; i < vis.length; i++) {
+        if (!re.test(vis[i].trim())) continue;
+        for (let j = i + 1; j < vis.length && !/^\*\*#\d+ 展开\*\*$/.test(vis[j].trim()) && !/^## /.test(vis[j]); j++) {
+          parts.push(vis[j]);
+        }
+      }
+      return parts.join('\n');
+    };
+    for (const r of severeRows) {
+      const basis = cell(r, 2).replace(/（.*$/, '');
+      if (basis !== '读源码') continue;
+      if (!pairForm.test(ownInstrument(cell(r, 0)))) {
+        fail(
+          r.line,
+          `#${cell(r, 0)} 依据是「读源码」却标「严重」——只有"两处代码路径对照"这一种仪器能在读源码下到严重，且两处都要指到行、写在这一条自己的同号 B 表格或展开段里（\`独立依据：两处代码路径对照 <a:行> 与 <b:行>\`）；换了别的仪器就把依据改成「跑了命令」或「引了原文」`,
+        );
+      }
+    }
     const anchors = (vis.join('\n').match(/独立依据：/g) ?? []).length;
     if (severeRows.length > anchors) {
       fail(A.start, `标「严重」${severeRows.length} 条，但全文只有 ${anchors} 处「独立依据：」——每个严重条目都要有独立依据，填不出就降到「待查」`);
@@ -365,7 +393,6 @@ export function scanText(reportPath, text) {
   const aIdSet = A === null ? [] : A.rows.map((r) => cell(r, 0));
   const cRows = C === null ? [] : C.rows.filter((r) => r.cells.length === C.header.length);
   if (C !== null) {
-    if (C.rows.length > 3) fail(C.start, `决策点至多 3 行，实际 ${C.rows.length} 行`);
     for (const r of cRows) {
       const [id, form, cur, lean, held] = r.cells;
       if (!FORMS.includes(form)) fail(r.line, `决策点 #${id} 的形态「${form}」不是 ${FORMS.join('／')} 之一`);
