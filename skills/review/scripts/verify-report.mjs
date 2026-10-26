@@ -414,6 +414,42 @@ export function scanText(reportPath, text) {
     }
   }
 
+  // ---- 「根因覆盖」：有收口时必须把 A 表编号分成"这条根因解释的"与"不解释的"两组 ----
+  // 判的是自洽（分完、不重、不与自己挂住的条目矛盾），不判根因对不对。
+  const kouRows = cRows.filter((r) => cell(r, 1) === '收口');
+  if (kouRows.length > 0) {
+    const coverLine = text
+      .split('\n')
+      .map((l) => l.trim().replace(/^\*\*|\*\*$/g, ''))
+      .find((l) => /^根因覆盖[：:]/.test(l));
+    if (coverLine === undefined) {
+      fail(
+        C.start,
+        `有 ${kouRows.length} 条「收口」，却没有 \`根因覆盖：解释 #…；不解释 #…（原因）\` 这一行——一条根因自洽地挂住两条、漏掉十条，校验器不会响，除非你把\"它解释哪几条、解释不了哪几条\"写出来`,
+      );
+    } else {
+      const body = coverLine.replace(/^根因覆盖[：:]\s*/, '');
+      const cut = body.search(/不解释/);
+      const explainPart = cut < 0 ? body : body.slice(0, cut);
+      const noPart = cut < 0 ? '' : body.slice(cut);
+      const explain = new Set((explainPart.match(/#\d+/g) || []).map((h) => h.slice(1)));
+      const no = new Set((noPart.match(/#\d+/g) || []).map((h) => h.slice(1)));
+      if (explain.size === 0) fail(C.start, '`根因覆盖` 的"解释"那一半一个编号都没有——要么写清它解释哪几条，要么说明没有收口');
+      const dup = [...explain].filter((id) => no.has(id));
+      if (dup.length > 0) fail(C.start, `#${dup.join(' #')} 同时出现在"解释"和"不解释"里`);
+      const missing = aIdSet.filter((id) => !explain.has(id) && !no.has(id));
+      if (missing.length > 0) fail(C.start, `#${missing.join(' #')} 没在 \`根因覆盖\` 里表态——每条发现都要么被这条根因解释，要么写明它属于另一层`);
+      const ghostIds = [...explain, ...no].filter((id) => !aIdSet.includes(id));
+      if (ghostIds.length > 0) fail(C.start, `\`根因覆盖\` 写了 #${ghostIds.join(' #')}，A 表里没有这几条`);
+      const heldByKou = new Set();
+      for (const r of kouRows) for (const h of cell(r, 4).match(/#\d+/g) || []) heldByKou.add(h.slice(1));
+      const conflict = [...heldByKou].filter((id) => no.has(id));
+      if (conflict.length > 0) {
+        fail(C.start, `#${conflict.join(' #')} 合进了「收口」、又在 \`根因覆盖\` 里说"不解释"——合到一条根因下又说它不是这条根因，这个合并不成立`);
+      }
+    }
+  }
+
   // ---- 每条 A 表条目要么归进某个决策点，要么进「零散」：恰好一次 ----
   // 这是对报告自己编号的分区检查，判的是事实（有没有漏、有没有重复），不是判断对错。
   const held = new Set();
