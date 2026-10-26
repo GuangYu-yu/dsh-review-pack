@@ -680,6 +680,13 @@ export function scanText(reportPath, text) {
     if (phrase !== null) notes.push(`第 ${cand.line} 行的表里有「${phrase}」——若是在说结论（而不是在说判据），改掉`);
   }
 
+  // ---- 局限 ----
+  // 「待查」不是级别，是一个交代：为什么判不了、缺什么、交给谁。没写这三样，等于把问题原样退回去。
+  const uncertain = A === null ? [] : A.rows.filter((r) => cell(r, 1) === '待查');
+  if (uncertain.length > 0 && !/^局限[：:]/m.test(text)) {
+    notes.push(`A 表里 ${uncertain.length} 条「待查」，但没有 \`局限：\` 那一行——按 references/format.md 第四节，待查要写清是"没走到""判不了"还是"该你定"，以及补什么才能判`);
+  }
+
   return { problems, notes };
 }
 
@@ -727,3 +734,4 @@ if (invokedDirectly) {
     console.log('\n全部通过。');
   }
 }
+
