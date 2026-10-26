@@ -37,7 +37,7 @@ metadata:
 | 补丁 / diff / PR / 变更集 | `references/diff.md` |
 | 一份实现（文件、模块）的质量 | `references/code.md` |
 | 结构与边界：模块划分、依赖方向 | `references/architecture.md` |
-| 某语言或某个界面栈的语义：机制与陷阱 | `references/lang/〈栈名〉.md`（如 Rust 是 rust.md、C++ 是 cpp.md、Web 界面是 web.md。**先把叫法归一**：js→javascript、ts→typescript、node→javascript、golang→go、sh／shell→bash、py→python、rs→rust、react／vue／css→web；归一后读不到，才走下一行） |
+| 某语言或某个界面栈的语义：机制与陷阱 | `references/lang/〈栈名〉.md`（如 Rust 是 rust.md、C++ 是 cpp.md、Web 界面是 web.md。**先把叫法归一**：js→javascript、ts→typescript、node→javascript、golang→go、sh／shell→bash、py→python、rs→rust、ps1→powershell、react／vue／css→web；归一后读不到，才走下一行） |
 | 为一个还没有清单的栈现场推导清单 | `references/lang/method.md` |
 | 失败路径的设计：重试、超时、恢复、回滚 | `references/robustness.md` |
 | 性能：代价随规模放大、往返、争用 | `references/performance.md` |
@@ -60,7 +60,7 @@ metadata:
 | 没有现成的改动可审，要自己取输入 | `references/intake.md` |
 | 要一张状态地图（哪些组合可构造但语义不成立、该收敛哪几个维度），而不是发现清单 | `references/state-space.md` |
 
-选件顺序：先按对象选一个。对象不明确时默认 `references/code.md`。**"没有改动可审"这一种情形分三路**：要你去取输入、或手上确实没有 diff 与文件 → `references/intake.md`，先取输入；问的是**该从哪查、先看什么**（"陌生项目先审哪些""没有清单"）→ `references/derive.md`，先冻结边界再推该审什么；输入只是"我说我改好了"这一类自述、没有可看的改动 → `references/discipline.md`。三者是先后关系：derive 定范围、intake 取不到输入、discipline 收尾。
+选件顺序：先按对象选一个。对象不明确时默认 `references/code.md`。**给了目标、没给对象**（"帮我审这个项目""这段代码有没有问题"）就按默认走 `references/code.md`，不要先读 `references/derive.md`；**对象与目标都没有**（"审点什么吧"）才进 `references/intake.md`，先问出对象与范围。**"没有改动可审"这一种情形分三路**：要你去取输入、或手上确实没有 diff 与文件 → `references/intake.md`，先取输入；问的是**该从哪查、先看什么**（"陌生项目先审哪些""没有清单"）→ `references/derive.md`，先冻结边界再推该审什么；输入只是"我说我改好了"这一类自述、没有可看的改动 → `references/discipline.md`。三者是先后关系：derive 定范围、intake 取不到输入、discipline 收尾。
 
 **分册会自己带路。** 命中的那一册在自己的头部声明它还要带谁（例如代码与变更集对象要求 `references/adversarial.md` 必载，动了不可逆状态就再叠 `references/verification.md`），照它说的叠。**入口只管第一次分发**，所以加规则时加到需要它的那一册里，由那一册自己声明——入口不必再动。
 
