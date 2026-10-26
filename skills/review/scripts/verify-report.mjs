@@ -608,6 +608,14 @@ export function scanText(reportPath, text) {
     if (!checkRe.test(vis[checkIdx].trim())) {
       fail(checkIdx + 1, '校验行只有三种写法：`校验 通过`、`校验 未通过：<条目>`、`校验 未跑：<原因>`');
     }
+    // 一条「严重」也没有时，读者分不清是"规则算出来的"还是"没往那儿看"——让作者对例外表个态。
+    if (A !== null && /^校验\s*通过/.test(vis[checkIdx].trim())) {
+      const lv = A.header.indexOf('级别');
+      const sev = lv < 0 ? 0 : A.rows.filter((r) => (r.cells[lv] || '').trim() === '严重').length;
+      if (sev === 0 && !/无严重级/.test(vis[checkIdx])) {
+        notes.push(`A 表一条「严重」也没有（${checkIdx + 1} 行）——若是只读评审按规则算出来的，在校验行写一句「无严重级（例外未用：〈理由〉）」，让读者知道是规则不行，而不是没看`);
+      }
+    }
   }
   notes.push('账本与用量');
 
