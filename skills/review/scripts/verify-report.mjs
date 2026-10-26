@@ -681,6 +681,19 @@ export function scanText(reportPath, text) {
   }
 
   // ---- 局限 ----
+  // 交出去的问题：`待答` 是那一句问话，`症结` 是为什么难；两者只在 `未决` 存在时成立。
+  const hasUndecided = /^未决：/m.test(text);
+  const answerLine = /^待答：(.*)$/m.exec(text);
+  if (/^症结：/m.test(text) && !hasUndecided) {
+    fail(1, '写了 `症结：` 却没有 `未决：`——症结是给交出去的那一问做注脚的，没有那一问，它只是感想');
+  }
+  if (answerLine !== null) {
+    if (!hasUndecided) fail(1, '写了 `待答：` 却没有 `未决：`——先写清卡在哪、已知什么、排除了什么，再问');
+    if (!/[？?]|是否/.test(answerLine[1])) {
+      fail(1, '`待答：` 那一行没有问号，也没有「是否」——它现在是结论，不是问题');
+    }
+  }
+
   // 「待查」不是级别，是一个交代：为什么判不了、缺什么、交给谁。没写这三样，等于把问题原样退回去。
   const uncertain = A === null ? [] : A.rows.filter((r) => cell(r, 1) === '待查');
   if (uncertain.length > 0 && !/^局限[：:]/m.test(text)) {
