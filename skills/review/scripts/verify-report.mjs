@@ -430,6 +430,12 @@ export function scanText(reportPath, text) {
   // ---- 「根因覆盖」：有收口时必须把 A 表编号分成"这条根因解释的"与"不解释的"两组 ----
   // 判的是自洽（分完、不重、不与自己挂住的条目矛盾），不判根因对不对。
   const kouRows = cRows.filter((r) => cell(r, 1) === '收口');
+  // 两条以上「收口」＝同一个判据被写了两遍：这是状态空间问题，不是"再多回源几条"。
+  if (kouRows.length >= 2) {
+    notes.push(
+      `决策点里有 ${kouRows.length} 条「收口」——这一轮已经走到状态空间门口了；按 references/state-space.md 导语的触发条件叠本册，给维度清单，才看得出同一空间里还有哪些组合也不该能构造`,
+    );
+  }
   if (kouRows.length > 0) {
     const coverLine = text
       .split('\n')
