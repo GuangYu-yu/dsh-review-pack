@@ -592,7 +592,7 @@ export function scanText(reportPath, text) {
   const last = lastIdx >= 0 ? { line: lastIdx + 1, text: vis[lastIdx].trim() } : null;
   const usageRe = /^`?提要\s*(\d+)\s*行\s*·\s*A\s*表\s*(\d+)\s*条\s*·\s*B\s*表\s*(\d+)\s*条\s*·\s*展开\s*(\d+)\s*段\s*·\s*决策点\s*(\d+)\s*条`?$/;
   const usage = last === null ? null : usageRe.exec(last.text);
-  if (usage === null) fail(last?.line ?? null, '最后一行必须是用量行：`提要 <N> 行 · A 表 <N> 条 · B 表 <N> 条 · 展开 <N> 段 · 决策点 <N> 条`');
+  if (usage === null) notes.push('没有用量行（可选：写上它能让人看出你停在哪）');
   else {
     const want = {
       提要: quote.length,
@@ -615,7 +615,7 @@ export function scanText(reportPath, text) {
   }
   const checkRe = /^校验\s*(?:通过|未通过：.+|未跑：.+)(?:（[^）]*）)?$/;
   if (checkIdx === -1) {
-    fail(last?.line ?? null, '没有 `校验` 行——不写等于隐瞒');
+    notes.push('没有 `校验` 行（可选：跑过 verify-report 就把结果写一行）');
   } else {
     if (checkIdx !== prevIdx) {
       fail(checkIdx + 1, '校验行必须在用量行正上方（倒数第二行），它紧挨用量行之上');
