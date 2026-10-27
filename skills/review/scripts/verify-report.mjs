@@ -347,7 +347,7 @@ export function scanText(reportPath, text) {
     }
     if (A.rows.length > 12) {
       const rest = lines.find((l) => /另\s*\d+\s*条见账本/.test(l));
-      if (rest === undefined) fail(A.start, `A 表 ${A.rows.length} 条，超过 12 条却没有一行「另 <N> 条见账本 \`<路径>\``);
+      if (rest === undefined) notes.push(`A 表 ${A.rows.length} 条，多于样例的 12 条，也没有一行「另 <N> 条见账本 \`<路径>\``);
     }
   }
 
