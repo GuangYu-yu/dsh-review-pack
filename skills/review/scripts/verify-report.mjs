@@ -81,14 +81,21 @@ function tableAt(vis, start) {
 const stripCode = (s) => s.replace(/`[^`]*`/g, '');
 const cell = (r, i) => (r.cells[i] === undefined ? '' : r.cells[i]);
 
-/** 校验一份报告的正文，返回 { problems, notes }。不读被审对象，只认结构。 */
+/** 校验一份报告的正文，返回 { problems, notes }。不读被审对象。 */
+const STRICT = process.argv.includes('--strict');
 export function scanText(reportPath, text) {
   const problems = [];
   const notes = [];
   const lines = norm(text).split('\n');
   const vis = maskFences(lines);
   const at = (n) => `${reportPath}:${n}`;
-  const fail = (n, msg) => problems.push(n === null ? msg : `${at(n)} ${msg}`);
+  // 外形不是规范：只有语义类判据算错，其余记提示。`--strict` 把提示也当错（自查时用）。
+  const SEMANTIC = /位置|依据|级别|严重|独立依据|槽位|HTML|图标|禁句|校验行|用量|账本|待答|症结|未决|问题列|修复方向|形态|挂住|根因覆盖|零散|同条数|没有 A 表却/;
+  const fail = (n, msg) => {
+    const line = n === null ? msg : `${at(n)} ${msg}`;
+    if (!STRICT && !SEMANTIC.test(msg)) { notes.push(line); return; }
+    problems.push(line);
+  };
 
   // ---- 标题与块序 ----
   const heads = [];
@@ -706,7 +713,7 @@ export function scanText(reportPath, text) {
 // 命令行入口：被 import 时不跑（自测夹具就是这样复用它，不必起子进程）。
 const invokedDirectly = process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href;
 if (invokedDirectly) {
-  const files = process.argv.slice(2);
+  const files = process.argv.slice(2).filter((a) => !a.startsWith('--'));
   if (files.length === 0) {
     console.error('用法：node verify-report.mjs <报告.md> [<报告.md> ...]');
     process.exit(2);
@@ -731,7 +738,8 @@ if (invokedDirectly) {
     }
     const { problems, notes } = scanText(f, text);
     if (problems.length === 0) {
-      console.log(`OK   ${f}（${notes.join('、')}）`);
+      const tip = notes.length === 0 ? '' : `（${notes.length} 条提示：${notes.slice(0, 3).join('；')}${notes.length > 3 ? `……等 ${notes.length} 条；--strict 当错` : ''}）`;
+      console.log(`OK   ${f}${tip}`);
     } else {
       bad += problems.length;
       console.log(`FAIL ${f}`);
