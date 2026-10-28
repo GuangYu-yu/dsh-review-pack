@@ -97,6 +97,18 @@ export function scanText(reportPath, text) {
     problems.push(line);
   };
 
+  // 条目式：不摆表，一条发现一段。没有表就没有表可核——只确认每条写了位置与最强反方，
+  // 其余交给人读。这是"少规则"要付的钱，不是漏实现。
+  const hasTable = /\|\s*-{3,}/.test(text);
+  const itemStyle =
+    !hasTable &&
+    /(^|\n)\s*(?:-\s*)?(?:\*\*)?位置(?:\*\*)?：/.test(text) &&
+    /(^|\n)\s*(?:-\s*)?(?:\*\*)?(?:最强反方|反方)(?:\*\*)?：/.test(text);
+  if (itemStyle) {
+    notes.push('条目式：没有表可核，只确认了每条写了位置与最强反方；深度与覆盖靠人读');
+    return { problems, notes };
+  }
+
   // ---- 标题与块序 ----
   const heads = [];
   for (let i = 0; i < vis.length; i++) {
