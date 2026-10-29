@@ -60,7 +60,7 @@ metadata:
 | 没有现成的改动可审，要自己取输入 | `references/intake.md` |
 | 要一张状态地图（哪些组合可构造但语义不成立、该收敛哪几个维度），而不是发现清单 | `references/state-space.md` |
 
-选件顺序：先按对象选一个。对象不明确时默认 `references/code.md`。**给了目标、没给对象**（"帮我审这个项目""这段代码有没有问题"）就按默认走 `references/code.md`，不要先读 `references/derive.md`；**对象与目标都没有**（"审点什么吧"）才进 `references/intake.md`，先问出对象与范围。**"没有改动可审"这一种情形分三路**：要你去取输入、或手上确实没有 diff 与文件 → `references/intake.md`，先取输入；问的是**该从哪查、先看什么**（"陌生项目先审哪些""没有清单"）→ `references/derive.md`，先冻结边界再推该审什么；输入只是"我说我改好了"这一类自述、没有可看的改动 → `references/discipline.md`。三者是先后关系：derive 定范围、intake 取不到输入、discipline 收尾。
+选件顺序：先按对象选一个。对象不明确时默认 `references/code.md`。**给了目标、没给对象**（"帮我审这个项目""这段代码有没有问题"）就按默认走 `references/code.md`，不要先读 `references/derive.md`；**对象与目标都没有**（"审点什么吧"）才进 `references/intake.md`，先问出对象与范围。**"没有改动可审"这一种情形分三路**：要你去取输入、或手上确实没有 diff 与文件 → `references/intake.md`，先取输入；问的是**该从哪查、先看什么**（"陌生项目先审哪些""没有清单"）→ `references/derive.md`，先冻结边界再推该审什么；输入只是"我说我改好了"这一类自述、没有可看的改动 → `references/discipline.md`。三者是先后关系：derive 定范围、intake 取不到输入、discipline 收尾。**两种都像时先 `references/intake.md`**：它的产出是"审什么"，定不下来就落在这里。
 
 **分册会自己带路。** 命中的那一册在自己的头部声明它还要带谁（例如代码与变更集对象要求 `references/adversarial.md` 必载，动了不可逆状态就再叠 `references/verification.md`），照它说的叠。**入口只管第一次分发**，所以加规则时加到需要它的那一册里，由那一册自己声明——入口不必再动。
 

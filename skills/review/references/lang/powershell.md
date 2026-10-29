@@ -42,6 +42,9 @@
 - `Select-Object -Last N` 或 `Sort-Object` 是阻塞命令，会先收集全部管道项再输出；在它们之前的 `PipelineVariable` 始终包含最后一个管道项，而非逐个迭代。不报：阻塞命令后不使用 `PipelineVariable` 做逐项处理
 - 管道中调用 CIM cmdlet 或 CDXML 命令时，对象在管道中间被意外累积，打破逐项处理语义。不报：管道中不混用 CIM 命令与逐项处理命令
 
+- 函数返回前 `Format-Table` / `Format-List`：对象被降级成格式指令，下游取属性全是空。
+- `ValueFromPipeline` 参数只在 `begin` / `end` 里处理、`process` 块不接：只处理最后一项。
+
 ## 数组与集合
 
 - 变量为 `$null` 时访问索引抛 `Cannot index into a null array`；**空数组不抛**（`@()[0]` 返回 `$null`）——判空要看的是变量本身。不报：访问前已检查 `$null -ne $array`（或 `$array -and $array.Count -gt 0`）

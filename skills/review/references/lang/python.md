@@ -79,6 +79,8 @@
 - `round` 是银行家舍入（3.13 实测：0.5→0、1.5→2、2.5→2），与数学教材的"四舍五入"不同。不报：已使用 `Decimal.quantize` 或显式加 `0.5`
 - 从 JSON/环境变量读入的"数字"常是 `str`：`'5' < 10` 抛 `TypeError`（3.13 实测），`'a' + b'a'` 同理。不报：类型已在读取边界处显式转换
 
+- 浮点用 `==` 判等、没有容差或 `math.isclose`：相等这件事在浮点上不成立。
+
 ## 资源与上下文
 
 - `open()` 不指定 `encoding` 时用 `locale.getpreferredencoding()`：**默认编码随环境变**（3.13.1 实测 `cp936`；Linux 通常 UTF-8、Windows 是 GBK/CP1252）。不报：已显式传入 `encoding='utf-8'`
