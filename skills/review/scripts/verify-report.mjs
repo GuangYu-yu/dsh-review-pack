@@ -91,9 +91,11 @@ export function scanText(reportPath, text) {
   const at = (n) => `${reportPath}:${n}`;
   // 外形不是规范：只有语义类判据算错，其余记提示。`--strict` 把提示也当错（自查时用）。
   const SEMANTIC = /位置|依据|级别|严重|独立依据|槽位|HTML|图标|禁句|校验行|用量|账本|待答|症结|未决|问题列|修复方向|形态|挂住|根因覆盖|零散|同条数|没有 A 表却/;
+  // 这几条只是"摆在哪、写成什么样"：挪个位置、换个行式，读者不丢任何东西。降成提示。
+  const LAYOUT = /段内——块序固定|校验行必须在用量行正上方|校验行只有三种写法|倾向」要以「修在|账本行不合形/;
   const fail = (n, msg) => {
     const line = n === null ? msg : `${at(n)} ${msg}`;
-    if (!STRICT && !SEMANTIC.test(msg)) { notes.push(line); return; }
+    if (!STRICT && (LAYOUT.test(msg) || !SEMANTIC.test(msg))) { notes.push(line); return; }
     problems.push(line);
   };
 
