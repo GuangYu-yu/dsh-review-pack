@@ -15,9 +15,9 @@ import { verify } from './verify-quotes.mjs';
 
 const USAGE = `用法：node review-check.mjs <产出目录> [--root <对象根>] [--lanes <lanes.json>] [--json]
 
-产出目录里应当只有一份交付物（报告或一段结论）；分过轮的评审再留一本合并后的账本，其余工作文件放在被审对象之外。
+产出目录里应当有一份交付物（报告或一段结论）；分过路或分过轮的评审，旁边还应当有一本合并后的账本，其余工作文件放在被审对象之外。
 --root 给了就同时核每条「文件:行号」锚点（文件在不在、行号越没越界）。
---lanes 给了就核分路覆盖：对象根下每个匹配扩展名的文件，至少被一路点名。`;
+--lanes 给了就核分路覆盖：对象根下每个匹配扩展名的文件，至少被一路点名；同时要求交付目录里有账本。`;
 
 const LEDGER_HEADER =
   /\|\s*#\s*\|\s*级别\s*\|\s*依据\s*\|[^\n]*\|[^\n]*修法[^\n]*\|[^\n]*反方[^\n]*\|[^\n]*撤回条件/;
@@ -55,7 +55,10 @@ export function runCheck({ dir, root = null, lanesFile = null }) {
   const reportFile = deliverables[0] || null;
   if (deliverables.length === 0) fail('目录里没有交付物——报告、一段结论、一张清单都算，工作文件不算');
   else if (deliverables.length > 1) fail(`有两份交付物：${deliverables.join('、')}——对外只交一份，其余放被审对象之外`);
-  if (!ledgerFile) notes.push('目录里没有账本——正常：账本是工作文件，不随报告交付');
+  if (!ledgerFile) {
+    if (lanesFile) fail('分过路却没有账本：交付目录里应当是报告 + 一本合并后的账本');
+    else notes.push('目录里没有账本——只有没分过路的轻量评审可以这样');
+  }
 
   // 2. 交付物的内容（不认形状）
   if (reportFile) {
