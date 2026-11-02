@@ -1,29 +1,25 @@
 #!/usr/bin/env node
-// 账本：定死列、校验、多本合并重编号。
+// 账本：按表头认列、校验、多本合并重编号。
 //
 // 用法：
 //   node scripts/ledger.mjs check <账本.md> [...]
 //   node scripts/ledger.mjs merge <输出.md> <账本.md> [...] [--no-dedupe]
 //
-// 只查能机械判真假的事：列数、词表、编号、依据与级别的相容、重复锚点、
-// 跨文件重复。不判断一条发现对不对，也不读被审对象。
+// 只认一件必需的事：表里要有「位置」列（脚本靠它回源）。其余列叫什么都行、
+// 有几列都行、顺序随意、编号可有可无。它只查能机械判真假的事：列数与表头对上、
+// 位置带 `文件:行号`、同位置重复。不判断一条发现对不对，也不读被审对象。
 //
 // 退出码：0 通过 / 1 有问题 / 2 用法或读取失败。
 
 import fs from 'node:fs';
 import path from 'node:path';
 
+// 只是一份示例表头（`usage` 里给人看）。账本按自己的表头来，不必照抄这八列。
 export const COLUMNS = ['#', '级别', '依据', '位置', '问题', '修法', '反方', '撤回条件'];
-export const LEVELS = ['严重', '一般', '待查'];
-export const BASES = ['跑了命令', '读源码', '引了原文', '推断'];
-export const CONFIDENCE = ['可证', '一环未读全', '存疑'];
-
-// 「严重」要有独立依据：真跑过的命令，或别人写的权威原文。
-const HARD_BASES = ['跑了命令', '引了原文'];
+export const REQUIRED_COLUMN = '位置';
 
 const SEPARATOR = /^\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?$/;
 const ANCHOR = /`?([A-Za-z0-9_./\\:-]*\.[A-Za-z0-9]+):(\d+)(?:-(\d+))?`?/;
-const EMOJI = /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F}]/u;
 
 function splitRow(line) {
   const trimmed = line.trim().replace(/^\|/, '').replace(/\|$/, '');
@@ -56,8 +52,8 @@ function stripCode(s) {
 }
 
 /**
- * 解析一份账本。允许它由多段组成，每段以一个 `# 标题` 开头、
- * 后面跟一张固定列的表（表头在每段里重复出现）。
+ * 解析一份账本。允许它由多段组成，每段以一个 `# 标题` 开头、后面跟一张表；
+ * 表头在每段里重复出现，列名由写的人定，但必须有「位置」。
  */
 export function parseLedger(text, file = '<ledger>') {
   const lines = text.split('\n');
@@ -67,7 +63,7 @@ export function parseLedger(text, file = '<ledger>') {
 
   const ensure = () => {
     if (section === null) {
-      section = { title: '', startLine: 1, rows: [] };
+      section = { title: '', startLine: 1, rows: [], columns: null, hasHeader: false };
       sections.push(section);
     }
     return section;
@@ -81,7 +77,7 @@ export function parseLedger(text, file = '<ledger>') {
     if (line === '') continue;
 
     if (/^#{1,6}\s/.test(line)) {
-      section = { title: line.replace(/^#{1,6}\s*/, '').trim(), startLine: no, rows: [] };
+      section = { title: line.replace(/^#{1,6}\s*/, '').trim(), startLine: no, rows: [], columns: null, hasHeader: false };
       sections.push(section);
       continue;
     }
@@ -93,74 +89,56 @@ export function parseLedger(text, file = '<ledger>') {
       continue;
     }
 
-    const cells = splitRow(raw);
-    const head = cells[0].replace(/`/g, '');
+    const cells = splitRow(raw).map(stripCode);
+    const sec = ensure();
 
-    if (head === '#' && cells.includes('级别')) {
-      const want = COLUMNS;
-      const same = cells.length === want.length && cells.every((c, k) => stripCode(c) === want[k]);
-      if (!same) {
-        problems.push({
-          file,
-          line: no,
-          msg: `表头必须是这八列且按此顺序：${want.join(' | ')}；实际是 ${cells.map(stripCode).join(' | ')}`,
-        });
+    // 表头：任意一列叫「位置」。认出来后这一段按这些列名解析。
+    if (!sec.hasHeader && cells.includes(REQUIRED_COLUMN)) {
+      sec.hasHeader = true;
+      sec.columns = cells;
+      if (new Set(cells).size !== cells.length) {
+        problems.push({ file, line: no, msg: `表头里有重名的列：${cells.join(' | ')}` });
       }
-      ensure();
-      section.hasHeader = true;
       continue;
     }
 
-    const sec = ensure();
     sec.rows.push({ file, line: no, cells });
   }
 
   return { file, sections, problems };
 }
 
-function parseBasis(cell, push) {
-  const raw = stripCode(cell);
-  const m = /^([^（(]+)(?:[（(]\s*([^）)]+?)\s*[）)])?$/.exec(raw);
-  if (m === null) return { basis: raw, confidence: null };
-  const basis = m[1].trim();
-  const confidence = m[2] === undefined ? null : m[2].trim();
-  return { basis, confidence };
-}
-
 /** 单行结构化；不合法也返回对象，问题记在 problems 里。 */
-export function readRow(row, push, columnsExpected = COLUMNS) {
-  if (row.cells.length !== columnsExpected.length) {
-    push(`一行必须是 ${columnsExpected.length} 列，这一行是 ${row.cells.length} 列——正文里的竖线要写成 \\|（Rust 闭包 |e|、|| 、位或都算）`);
+export function readRow(row, push, columns) {
+  if (row.cells.length !== columns.length) {
+    push(`一行必须是 ${columns.length} 列（与表头 ${columns.join(' | ')} 对齐），这一行是 ${row.cells.length} 列——正文里的竖线要写成 \\|（Rust 闭包 |e|、|| 、位或都算）`);
     return null;
   }
-  const [n, level, basisCell, loc, problem, fix, counter, retract] = row.cells.map((c) => c);
-  const out = {
-    file: row.file,
-    line: row.line,
-    n: Number(stripCode(n)),
-    level: stripCode(level),
-    basisCell: stripCode(basisCell),
-    loc: stripCode(loc),
-    problem: stripCode(problem),
-    fix: stripCode(fix),
-    counter: stripCode(counter),
-    retract: stripCode(retract),
-  };
+  const values = new Map();
+  columns.forEach((name, i) => values.set(name, row.cells[i]));
+  const get = (name) => (values.has(name) ? stripCode(values.get(name)) : null);
 
-  if (!Number.isInteger(out.n) || out.n <= 0) push(`第一列必须是正整数编号，实际是「${n}」`);
-  if (out.level === '') push('轻重那一列不能空——写清后果有多重，词你自己定');
+  const out = { file: row.file, line: row.line, value: (name) => get(name), values };
 
-  const { basis, confidence } = parseBasis(basisCell, push);
-  out.basis = basis;
-  out.confidence = confidence;
+  const n = get('#');
+  if (n !== null) {
+    out.n = Number(n);
+    if (!Number.isInteger(out.n) || out.n <= 0) push(`编号列必须是正整数，实际是「${n}」`);
+  }
+
+  const level = get('级别');
+  if (level !== null && level === '') push('轻重的列空着——写清后果有多重，词你自己定');
+
+  const loc = get(REQUIRED_COLUMN) ?? '';
+  out.loc = loc;
 
   // 槽位（`〈…〉`）是模板标记：账本是要交的，位置里留着它说明模板没填完。
-  if (/〈[^〈〉\n]{1,60}〉/.test(out.loc)) {
-    push(`位置里还有没填的槽位（模板不是交付物）：${out.loc}`);
+  if (/〈[^〈〉\n]{1,60}〉/.test(loc)) {
+    push(`位置里还有没填的槽位（模板不是交付物）：${loc}`);
   } else {
-    const anchor = ANCHOR.exec(out.loc);
+    const anchor = ANCHOR.exec(loc);
     if (anchor === null) {
-      push(`位置必须带 \`文件:行号\`，实际是「${out.loc}」`);
+      push(`位置必须带 \`文件:行号\`，实际是「${loc}」`);
     } else {
       out.locPath = anchor[1];
       out.locFrom = Number(anchor[2]);
@@ -169,22 +147,12 @@ export function readRow(row, push, columnsExpected = COLUMNS) {
     }
   }
 
-  for (const [key, label] of [
-    ['problem', '问题'],
-    ['fix', '修法'],
-    ['counter', '反方'],
-    ['retract', '撤回条件'],
-  ]) {
-    if (out[key] === '' || out[key] === '-') push(`${label}这一列不能空`);
+  for (const label of ['问题', '修法', '反方', '撤回条件']) {
+    const v = get(label);
+    if (v !== null && v === '') push(`「${label}」这一列空着——这一列既然有，就别留空`);
   }
-
-  // 「把失败静默当成成功」是唯一的例外：仪器可以是两处代码路径的对照，
-  // 两处都要指到具体行（`独立依据：两处代码路径对照 <a:12> 与 <b:34>`），只指一处不算。
-  const whole = row.cells.join('|');
-  const pair =
-    /独立依据：\s*两处代码路径对照[^|]*?[A-Za-z0-9_./\\-]+\.[A-Za-z0-9]+:\d+[^|]*?与[^|]*?[A-Za-z0-9_./\\-]+\.[A-Za-z0-9]+:\d+/.test(whole);
-
-  if (out.retract === '无') {
+  const retract = get('撤回条件');
+  if (retract === '无') {
     push('撤回条件写「无」，等于说这条不可证伪；写清什么情况会让它不成立');
   }
 
@@ -198,40 +166,55 @@ export function validateFile(text, file = '<ledger>') {
   const rows = [];
 
   for (const section of parsed.sections) {
-    const push = (msg) => problems.push({ file, line: section.rows[0]?.line ?? section.startLine, msg });
     if (section.rows.length > 0 && section.hasHeader !== true) {
-      problems.push({ file, line: section.startLine, msg: '这一段缺表头：每段开头要写 `# <路号> · <主责范围>`，然后是八列表头' });
+      problems.push({
+        file,
+        line: section.startLine,
+        msg: `这一段缺表头：表的第一行要写列名，其中必须有「${REQUIRED_COLUMN}」`,
+      });
+      continue;
     }
+    if (section.hasHeader && !section.columns.includes(REQUIRED_COLUMN)) {
+      problems.push({
+        file,
+        line: section.startLine,
+        msg: `表头里没有「${REQUIRED_COLUMN}」列——脚本靠它回源；表头是 ${section.columns.join(' | ')}`,
+      });
+      continue;
+    }
+
+    const columns = section.columns ?? [];
+    const numbered = columns.includes('#');
     let expected = 1;
     for (const row of section.rows) {
-      const problemsBefore = problems.length;
-      const push2 = (msg) => problems.push({ file, line: row.line, msg });
-      const parsedRow = readRow(row, push2);
+      const push = (msg) => problems.push({ file, line: row.line, msg });
+      const parsedRow = readRow(row, push, columns);
       if (parsedRow === null) continue;
-      if (parsedRow.n !== expected) {
-        problems.push({ file, line: row.line, msg: `编号应当连续，这一行是 ${parsedRow.n}，按位置应当是 ${expected}` });
+      if (numbered) {
+        if (parsedRow.n !== expected) {
+          problems.push({ file, line: row.line, msg: `编号应当连续，这一行是 ${parsedRow.n}，按位置应当是 ${expected}` });
+        }
+        expected = (Number.isInteger(parsedRow.n) ? parsedRow.n : expected) + 1;
+      } else {
+        parsedRow.n = expected;
+        expected += 1;
       }
-      expected = parsedRow.n + 1;
-      rows.push({ ...parsedRow, section: section.title });
-      if (problems.length > problemsBefore) continue;
+      rows.push({ ...parsedRow, section: section.title, columns });
     }
   }
 
   // 同一本内重复锚点：完全相同的（位置 + 问题）＝自相重复；（位置相同、问题不同）＝提示合并。
   const seen = new Map();
   for (const row of rows) {
+    if (row.locPath === undefined) continue;
     const key = `${row.locPath}:${row.locFrom}`;
     const prev = seen.get(key);
     if (prev === undefined) {
       seen.set(key, row);
       continue;
     }
-    if (prev.problem === row.problem) {
-      problems.push({
-        file: row.file,
-        line: row.line,
-        msg: `与第 ${prev.line} 行重复：同一个位置、同一句话（${key}）`,
-      });
+    if (prev.value('问题') === row.value('问题')) {
+      problems.push({ file: row.file, line: row.line, msg: `与第 ${prev.line} 行重复：同一个位置、同一句话（${key}）` });
     } else {
       notes.push({ file: row.file, line: row.line, msg: `同一位置在第 ${prev.line} 行还有一条不同表述，可能需要合并（${key}）` });
     }
@@ -247,50 +230,61 @@ export function mergeLedgers(inputs, { dedupe = true } = {}) {
   const seen = new Set();
   let n = 0;
 
+  // 合并后的表头：写的人用过的列名，按第一次出现的顺序；`#` 排在最前。
+  const order = [];
+  const remember = (name) => {
+    if (name !== '#' && !order.includes(name)) order.push(name);
+  };
+
   for (const input of inputs) {
     const result = validateFile(input.text, input.file);
     problems.push(...result.problems);
     notes.push(...result.notes);
-    const rows = [];
     const bySection = new Map();
     for (const row of result.rows) {
+      for (const c of row.columns) remember(c);
       const section = row.section || input.file;
       if (!bySection.has(section)) bySection.set(section, []);
       bySection.get(section).push(row);
     }
-    for (const [title, list] of bySection) {
-      rows.push({ title, rows: list });
-    }
-    blocks.push({ file: input.file, sections: rows });
+    blocks.push({ file: input.file, sections: [...bySection] });
   }
+
+  if (!order.includes(REQUIRED_COLUMN)) order.unshift(REQUIRED_COLUMN);
+  const header = ['#', ...order];
 
   const out = [];
   for (const block of blocks) {
-    for (const section of block.sections) {
+    for (const [title, list] of block.sections) {
       const kept = [];
-      for (const row of section.rows) {
-        const key = `${row.locPath}:${row.locFrom}|${row.problem}|${row.level}|${row.basis}`;
+      for (const row of list) {
+        const key = `${row.locPath}:${row.locFrom}|${row.value('问题') ?? ''}|${row.value('级别') ?? ''}|${row.value('依据') ?? ''}`;
         if (dedupe && seen.has(key)) {
           notes.push({ file: row.file, line: row.line, msg: `合并时去掉一条重复：${row.locPath}:${row.locFrom}` });
           continue;
         }
         seen.add(key);
         n += 1;
-        kept.push({ ...row, n });
+        kept.push({ row, n });
       }
       if (kept.length === 0) continue;
-      out.push(`# ${section.title}`);
+      out.push(`# ${title}`);
       out.push('');
-      out.push(`| ${COLUMNS.join(' | ')} |`);
-      out.push(`|${COLUMNS.map(() => '---').join('|')}|`);
+      out.push(`| ${header.join(' | ')} |`);
+      out.push(`|${header.map(() => '---').join('|')}|`);
+      // 段内编号从 1 起：合出来的每一段都要能被 check 原样接受。
       let k = 0;
-      for (const row of kept) {
+      for (const { row } of kept) {
         k += 1;
-        out.push(
-          `| ${k} | ${esc(row.level)} | ${esc(row.basisCell)} | \`${row.locPath}:${row.locFrom}${
-            row.locTo !== row.locFrom ? `-${row.locTo}` : ''
-          }\` | ${esc(row.problem)} | ${esc(row.fix)} | ${esc(row.counter)} | ${esc(row.retract)} |`,
-        );
+        const no = k;
+        const cells = header.map((name) => {
+          if (name === '#') return String(no);
+          if (name === REQUIRED_COLUMN) {
+            return `\`${row.locPath}:${row.locFrom}${row.locTo !== row.locFrom ? `-${row.locTo}` : ''}\``;
+          }
+          return esc(row.value(name) ?? '');
+        });
+        out.push(`| ${cells.join(' | ')} |`);
       }
       out.push('');
     }
@@ -304,9 +298,12 @@ function usage() {
   node scripts/ledger.mjs check <账本.md> [...]
   node scripts/ledger.mjs merge <输出.md> <账本.md> [...] [--no-dedupe]
 
-账本每段以 "# <路号> · <主责范围>" 开头，随后是八列表：
+账本是一张或几张表，表头你自己定，但**必须有一列叫「${REQUIRED_COLUMN}」**，
+里面写 \`文件:行号\`。其余列可有可无、叫什么都行、顺序随意，编号列也可省。
+下面只是一份常见写法，不必照抄：
   ${COLUMNS.join(' | ')}
-只查能机械判真假的事；不判断一条发现对不对，也不读被审对象。`);
+
+它只查能机械判真假的事；不判断一条发现对不对，也不读被审对象。`);
 }
 
 function main(argv) {
@@ -330,19 +327,19 @@ function main(argv) {
       let text;
       try {
         text = fs.readFileSync(file, 'utf8');
-      } catch (error) {
-        console.error(`读不了 ${file}：${error.message}`);
-        return 2;
+      } catch {
+        console.error(`读不到：${file}`);
+        bad += 1;
+        continue;
       }
       const result = validateFile(text, file);
       total += result.rows.length;
-      for (const p of result.problems) {
-        console.log(`不通过 ${p.file}:${p.line} ${p.msg}`);
-        bad += 1;
-      }
-      for (const note of result.notes) console.log(`提示 ${note.file}:${note.line} ${note.msg}`);
+      for (const p of result.problems) console.log(`FAIL ${p.file}:${p.line} ${p.msg}`);
+      for (const p of result.notes) console.log(`NOTE ${p.file}:${p.line} ${p.msg}`);
+      if (result.problems.length === 0) console.log(`OK   ${file}（${result.rows.length} 条）`);
+      else bad += 1;
     }
-    console.log(`账本 ${files.length} 本 · ${total} 条 · 不通过 ${bad} 项`);
+    console.log(`合计 ${total} 条${bad === 0 ? '，没有发现问题' : `，${bad} 份不通过`}`);
     return bad === 0 ? 0 : 1;
   }
 
@@ -356,31 +353,26 @@ function main(argv) {
     for (const file of files) {
       try {
         inputs.push({ file, text: fs.readFileSync(file, 'utf8') });
-      } catch (error) {
-        console.error(`读不了 ${file}：${error.message}`);
+      } catch {
+        console.error(`读不到：${file}`);
         return 2;
       }
     }
     const result = mergeLedgers(inputs, { dedupe });
-    if (result.problems.length > 0) {
-      for (const p of result.problems) console.log(`不通过 ${p.file}:${p.line} ${p.msg}`);
-      console.log(`合并没有写盘：源账本本身有 ${result.problems.length} 项不通过，先修再合`);
-      return 1;
-    }
+    fs.mkdirSync(path.dirname(outFile), { recursive: true });
     fs.writeFileSync(outFile, result.text);
-    for (const note of result.notes) console.log(`提示 ${note.file}:${note.line} ${note.msg}`);
-    console.log(`已合并 ${files.length} 本 → ${outFile} · ${result.total} 条`);
-    return 0;
+    for (const p of result.problems) console.log(`FAIL ${p.file}:${p.line} ${p.msg}`);
+    for (const p of result.notes) console.log(`NOTE ${p.file}:${p.line} ${p.msg}`);
+    console.log(`合并完成：${outFile}（${result.total} 条）`);
+    return result.problems.length === 0 ? 0 : 1;
   }
 
   usage();
   return 2;
 }
 
-if (process.argv[1] !== undefined) {
-  const self = path.resolve(process.argv[1]);
-  const here = path.resolve(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'));
-  if (self === here) {
-    process.exitCode = main(process.argv);
-  }
+const invoked = process.argv[1] !== undefined;
+const self = decodeURIComponent(new URL(import.meta.url).pathname).replace(/^\/([A-Za-z]:)/, '$1');
+if (invoked && path.resolve(process.argv[1]) === path.resolve(self)) {
+  process.exitCode = main(process.argv);
 }
