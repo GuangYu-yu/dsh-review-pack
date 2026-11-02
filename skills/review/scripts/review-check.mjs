@@ -1,17 +1,21 @@
 #!/usr/bin/env node
-// 一次跑完全部机械检查：交付物的形状、账本、锚点、目录残留、分路覆盖。
+// 一次跑完全部机械检查：交付物的内容、账本、锚点、目录残留、分路覆盖。
 // 用法：
 //   node review-check.mjs <产出目录> [--root <对象根>] [--lanes <lanes.json>] [--json]
 // 退出码：0 全部通过；1 有不通过项；2 用法或环境错误。
+//
+// 它不认报告的形状：没有段名、没有表也能过。内容项由 check-claims.mjs 判
+// （未填槽位、审批词、完整性命题、依据用词、标「严重」处有没有硬依据），
+// 这里只管"该不该出现在这个目录里"和"能不能对上源"。
 import fs from 'node:fs';
 import path from 'node:path';
-import { scanText } from './verify-report.mjs';
+import { scan as scanClaims } from './check-claims.mjs';
 import { validateFile } from './ledger.mjs';
 import { verify } from './verify-quotes.mjs';
 
 const USAGE = `用法：node review-check.mjs <产出目录> [--root <对象根>] [--lanes <lanes.json>] [--json]
 
-产出目录里应当只有两样东西：一份报告、一份账本（没分过轮的评审可以只有报告）。
+产出目录里应当只有一份交付物（报告或一段结论）；分过轮的评审再留一本合并后的账本，其余工作文件放在被审对象之外。
 --root 给了就同时核每条「文件:行号」锚点（文件在不在、行号越没越界）。
 --lanes 给了就核分路覆盖：对象根下每个匹配扩展名的文件，至少被一路点名。`;
 
@@ -28,41 +32,35 @@ export function runCheck({ dir, root = null, lanesFile = null }) {
     return { ok: false, problems: [`产出目录不存在：${dir}`], notes };
   }
 
-  // 1. 目录里有什么
+  // 1. 目录里有什么：账本另算，其余 .md 都是候选交付物
   const md = fs
     .readdirSync(dir, { withFileTypes: true })
     .filter((d) => d.isFile())
     .map((d) => d.name)
     .filter((f) => f.toLowerCase().endsWith('.md'))
     .sort();
-  let reportFile = null;
+  const deliverables = [];
   let ledgerFile = null;
   for (const name of md) {
     const text = fs.readFileSync(path.join(dir, name), 'utf8');
-    const isReport = /^#\s*评审报告/m.test(text);
     const isLedger = LEDGER_HEADER.test(text);
-    if (isReport && isLedger) {
-      fail(`${name}：既是报告又是账本，不能当一份用`);
-    } else if (isReport) {
-      if (reportFile) fail(`有两份报告：${reportFile}、${name}——对外只交一份`);
-      else reportFile = name;
-    } else if (isLedger) {
+    if (isLedger) {
       if (/ledger-L\d+/i.test(name)) fail(`${name}：这是分路账本，回收时应当已经合并并删掉`);
       else if (ledgerFile) fail(`有两份账本：${ledgerFile}、${name}——合并后只留一份`);
       else ledgerFile = name;
     } else {
-      fail(`${name}：认不出是报告还是账本；产出目录里不该放别的东西`);
+      deliverables.push(name);
     }
   }
-  if (!reportFile) fail('目录里没有报告（报告一级标题是 `# 评审报告 · <对象名>`）');
-  if (!ledgerFile) notes.push('目录里没有账本（只读一遍、没分轮的评审本来就没有账本）');
+  const reportFile = deliverables[0] || null;
+  if (deliverables.length === 0) fail('目录里没有交付物——报告、一段结论、一张清单都算，工作文件不算');
+  else if (deliverables.length > 1) fail(`有两份交付物：${deliverables.join('、')}——对外只交一份，其余放被审对象之外`);
+  if (!ledgerFile) notes.push('目录里没有账本——正常：账本是工作文件，不随报告交付');
 
-  // 2. 报告形状
+  // 2. 交付物的内容（不认形状）
   if (reportFile) {
     const p = path.join(dir, reportFile);
-    const r = scanText(p, fs.readFileSync(p, 'utf8'));
-    for (const item of r.problems) fail(`报告 ${item}`);
-    for (const n of r.notes || []) notes.push(`报告 ${n}`);
+    for (const item of scanClaims(fs.readFileSync(p, 'utf8'))) fail(`交付物 ${reportFile} ${item}`);
   }
 
   // 3. 账本
@@ -78,7 +76,7 @@ export function runCheck({ dir, root = null, lanesFile = null }) {
   if (reportFile && root) {
     const p = path.join(dir, reportFile);
     const q = verify(fs.readFileSync(p, 'utf8'), { file: reportFile, root: path.resolve(root) });
-    if (q.anchorsChecked === 0) notes.push('锚点 0 处：报告里没有任何 `文件:行号`，这一项没有可核的');
+    if (q.anchorsChecked === 0) notes.push('锚点 0 处：交付物里没有任何 `文件:行号`，这一项没有可核的');
     for (const item of q.problems) fail(`锚点 ${item.msg || item.code}`);
     notes.push(`锚点 ${q.anchorsChecked} 处 · 引文 ${q.quotesChecked} 条 · 提示 ${q.advisories.length} 项`);
   }

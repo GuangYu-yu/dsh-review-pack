@@ -124,15 +124,6 @@ function parseBasis(cell, push) {
   if (m === null) return { basis: raw, confidence: null };
   const basis = m[1].trim();
   const confidence = m[2] === undefined ? null : m[2].trim();
-  if (!BASES.includes(basis)) {
-    push(`依据只能是 ${BASES.join('／')}，实际写的是「${basis}」`);
-  }
-  if (confidence !== null && !CONFIDENCE.includes(confidence)) {
-    push(`确认程度只能是 ${CONFIDENCE.join('／')}，实际写的是「${confidence}」`);
-  }
-  if (confidence !== null && basis === '推断') {
-    push('推断这一档已经不声称掌握了事实，后面不必再跟确认程度');
-  }
   return { basis, confidence };
 }
 
@@ -157,7 +148,7 @@ export function readRow(row, push, columnsExpected = COLUMNS) {
   };
 
   if (!Number.isInteger(out.n) || out.n <= 0) push(`第一列必须是正整数编号，实际是「${n}」`);
-  if (!LEVELS.includes(out.level)) push(`级别只能是 ${LEVELS.join('／')}，实际是「${out.level}」`);
+  if (out.level === '') push('轻重那一列不能空——写清后果有多重，词你自己定');
 
   const { basis, confidence } = parseBasis(basisCell, push);
   out.basis = basis;
@@ -193,13 +184,9 @@ export function readRow(row, push, columnsExpected = COLUMNS) {
   const pair =
     /独立依据：\s*两处代码路径对照[^|]*?[A-Za-z0-9_./\\-]+\.[A-Za-z0-9]+:\d+[^|]*?与[^|]*?[A-Za-z0-9_./\\-]+\.[A-Za-z0-9]+:\d+/.test(whole);
 
-  if (out.level === '严重' && !HARD_BASES.includes(out.basis) && !pair) {
-    push('「严重」要有独立依据（跑了命令或引了原文；「把失败静默当成成功」可用「独立依据：两处代码路径对照 <a:行> 与 <b:行>」）；这一条的依据是「' + out.basis + '」');
-  }
   if (out.retract === '无') {
     push('撤回条件写「无」，等于说这条不可证伪；写清什么情况会让它不成立');
   }
-  if (EMOJI.test(row.cells.join('|'))) push('账本里不用图标（含 emoji）');
 
   return out;
 }
