@@ -5,8 +5,8 @@
 // 退出码：0 全部通过；1 有不通过项；2 用法或环境错误。
 //
 // 它不认报告的形状：没有段名、没有表也能过。内容项由 check-claims.mjs 判
-// （未填槽位、审批词、完整性命题、依据用词、标「严重」处有没有硬依据），
-// 这里只管"该不该出现在这个目录里"和"能不能对上源"。
+// （未填槽位、替读者宣布通过、完整性命题三类），这里只管"该不该出现在这个目录里"
+// 和"能不能对上源"。账本的形状也由主审定：只要有一张表、表头里有「位置」列。
 import fs from 'node:fs';
 import path from 'node:path';
 import { scan as scanClaims } from './check-claims.mjs';
@@ -19,8 +19,24 @@ const USAGE = `用法：node review-check.mjs <产出目录> [--root <对象根>
 --root 给了就同时核每条「文件:行号」锚点（文件在不在、行号越没越界）。
 --lanes 给了就核分路覆盖：对象根下每个匹配扩展名的文件，至少被一路点名；同时要求交付目录里有账本。`;
 
-const LEDGER_HEADER =
-  /\|\s*#\s*\|\s*级别\s*\|\s*依据\s*\|[^\n]*\|[^\n]*修法[^\n]*\|[^\n]*反方[^\n]*\|[^\n]*撤回条件/;
+// 账本：表头里有一列叫「位置」，正文基本就是这张表。不认列名、不认列数、不认顺序——
+// 曾经用一张固定列名的正则认账本，结果自由表头的账本被当成了第二份交付物。
+const LEDGER_COLUMN = /\|\s*位置\s*\|/;
+function looksLikeLedger(name, text) {
+  if (!LEDGER_COLUMN.test(text)) return false;
+  if (/ledger|账本/i.test(name)) return true;
+  let table = 0;
+  let prose = 0;
+  for (const raw of text.split(/\r?\n/)) {
+    const t = raw.trim();
+    if (!t || t.startsWith('#') || t.startsWith('>')) continue;
+    if (t.startsWith('|')) table += 1;
+    else prose += 1;
+  }
+  // 账本整篇就是表（加表头与注解）；报告总有几行成文的句子。一条正文都没有才算账本——
+  // 放宽到"几行以内"时，一张只有表格的报告会被判成账本，于是"两份账本、没有交付物"。
+  return table >= 2 && prose === 0;
+}
 const SKIP_DIRS = ['.git', 'node_modules', 'target', 'dist', '.release', 'vendor', '.next'];
 
 export function runCheck({ dir, root = null, lanesFile = null }) {
@@ -43,7 +59,7 @@ export function runCheck({ dir, root = null, lanesFile = null }) {
   let ledgerFile = null;
   for (const name of md) {
     const text = fs.readFileSync(path.join(dir, name), 'utf8');
-    const isLedger = LEDGER_HEADER.test(text);
+    const isLedger = looksLikeLedger(name, text);
     if (isLedger) {
       if (/ledger-L\d+/i.test(name)) fail(`${name}：这是分路账本，回收时应当已经合并并删掉`);
       else if (ledgerFile) fail(`有两份账本：${ledgerFile}、${name}——合并后只留一份`);

@@ -21,11 +21,9 @@ const IDENT = /^[A-Za-z_][A-Za-z0-9_:]*$/;
 const EMOJI = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}]/u;
 const SKIP_DIRS = new Set(['.git', 'node_modules', 'dist', '.release', 'target', '.next', 'vendor']);
 
-// 这些是包自己的词，被反引号括起来时不是引文。
-const VOCAB = new Set([
-  '严重', '一般', '待查', '跑了命令', '读源码', '引了原文', '推断',
-  '可证', '一环未读全', '存疑', '账本', 'A 表', 'B 表', 'C 表', 'D 表',
-]);
+// 这些是包自己的词，被反引号括起来时不是引文。词表只收形态固定的那几个：
+// 分册已经不再提供「严重／一般／待查」这类等级词与固定的依据词表，留在这里会让人以为它们仍然有效。
+const VOCAB = new Set(['账本', '覆盖限制', '交接实验']);
 
 function splitRow(line) {
   const trimmed = line.trim().replace(/^\|/, '').replace(/\|$/, '');

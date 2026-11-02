@@ -14,8 +14,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-// 只是一份示例表头（`usage` 里给人看）。账本按自己的表头来，不必照抄这八列。
-export const COLUMNS = ['#', '级别', '依据', '位置', '问题', '修法', '反方', '撤回条件'];
+// 只是一份示例表头（自测夹具与 `usage` 里给人看）。账本按自己的表头来：
+// 唯一的要求是有一列叫「位置」，其余列叫什么、有几列、顺不顺序都由你定。
+export const COLUMNS = ['#', '位置', '问题', '依据', '反方', '撤回条件'];
 export const REQUIRED_COLUMN = '位置';
 
 const SEPARATOR = /^\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?$/;
@@ -258,7 +259,7 @@ export function mergeLedgers(inputs, { dedupe = true } = {}) {
     for (const [title, list] of block.sections) {
       const kept = [];
       for (const row of list) {
-        const key = `${row.locPath}:${row.locFrom}|${row.value('问题') ?? ''}|${row.value('级别') ?? ''}|${row.value('依据') ?? ''}`;
+        const key = `${row.locPath}:${row.locFrom}|${row.value('问题') ?? ''}|${row.value('依据') ?? ''}`;
         if (dedupe && seen.has(key)) {
           notes.push({ file: row.file, line: row.line, msg: `合并时去掉一条重复：${row.locPath}:${row.locFrom}` });
           continue;
@@ -359,12 +360,17 @@ function main(argv) {
       }
     }
     const result = mergeLedgers(inputs, { dedupe });
+    // 源有毛病就不写盘：把不合格的行合进总账，等于把错误洗成了唯一版本。
+    if (result.problems.length > 0) {
+      for (const p of result.problems) console.log(`FAIL ${p.file}:${p.line} ${p.msg}`);
+      console.log(`没有写盘：先把上面这几条改好，再合并。`);
+      return 1;
+    }
     fs.mkdirSync(path.dirname(outFile), { recursive: true });
     fs.writeFileSync(outFile, result.text);
-    for (const p of result.problems) console.log(`FAIL ${p.file}:${p.line} ${p.msg}`);
     for (const p of result.notes) console.log(`NOTE ${p.file}:${p.line} ${p.msg}`);
     console.log(`合并完成：${outFile}（${result.total} 条）`);
-    return result.problems.length === 0 ? 0 : 1;
+    return 0;
   }
 
   usage();
