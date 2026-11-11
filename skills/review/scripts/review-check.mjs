@@ -10,7 +10,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { scan as scanClaims } from './check-claims.mjs';
-import { validateFile } from './ledger.mjs';
+import { validateFile, parseLedger } from './ledger.mjs';
 import { verify } from './verify-quotes.mjs';
 
 const USAGE = `用法：node review-check.mjs <产出目录> [--root <对象根>] [--lanes <lanes.json>] [--json]
@@ -85,10 +85,22 @@ export function runCheck({ dir, root = null, lanesFile = null }) {
   // 3. 账本
   if (ledgerFile) {
     const p = path.join(dir, ledgerFile);
-    const v = validateFile(fs.readFileSync(p, 'utf8'), ledgerFile);
+    const text = fs.readFileSync(p, 'utf8');
+    const v = validateFile(text, ledgerFile);
     const list = v.problems || (Array.isArray(v) ? v : []);
     for (const item of list) fail(`账本 ${typeof item === 'string' ? item : item.msg || JSON.stringify(item)}`);
     notes.push(`账本 ${ledgerFile}：${(v.rows || []).length} 条`);
+
+    // 根节：报告第 2 项的唯一来源。条目够多却一条根都不写，说明分组那一环没做。
+    if ((v.rows || []).length >= 5) {
+      const { sections } = parseLedger(text, ledgerFile);
+      const roots = (sections || []).filter((s) => /根|合并|独立/.test(s.title || '') && s.rows.length > 0);
+      if (roots.length === 0) {
+        fail(`账本 ${ledgerFile} 没有「根」这一节（${v.rows.length} 条发现）：报告第 2 项会没有来源——一行一个根，写改哪一处、挂着哪几条、什么会推翻它；一条都并不起来就写一行"无可合并，N 条独立"`);
+      } else {
+        notes.push(`根 ${roots.reduce((n, s) => n + s.rows.length, 0)} 条（${roots.map((s) => s.title).join('、')}）`);
+      }
+    }
   }
 
   // 4. 锚点
@@ -98,6 +110,16 @@ export function runCheck({ dir, root = null, lanesFile = null }) {
     if (q.anchorsChecked === 0) notes.push('锚点 0 处：交付物里没有任何 `文件:行号`，这一项没有可核的');
     for (const item of q.problems) fail(`锚点 ${item.msg || item.code}`);
     notes.push(`锚点 ${q.anchorsChecked} 处 · 引文 ${q.quotesChecked} 条 · 提示 ${q.advisories.length} 项`);
+  }
+
+  // 4b. 第 2 项：发现了若干条，却没写"哪些条共用一个改动"（或没写它们互相独立）
+  if (reportFile) {
+    const text = fs.readFileSync(path.join(dir, reportFile), 'utf8');
+    const anchors = (text.match(/[A-Za-z0-9_./\\:-]*\.[A-Za-z0-9]+:\d+/g) || []).length;
+    const declared = /根因|共同根|可合并|互相独立|各自独立|彼此独立|只有散条|综合没做/.test(text);
+    if (anchors >= 4 && !declared) {
+      fail(`交付物 ${reportFile} 有 ${anchors} 处位置，却没有"哪些条会被同一个改动一起消掉"的结论，也没写"互相独立"——第 2 项空着要写成结论，沉默读者分不清是判过还是没走到`);
+    }
   }
 
   // 5. 分路覆盖
