@@ -94,11 +94,16 @@ export function runCheck({ dir, root = null, lanesFile = null }) {
     // 根节：报告第 2 项的唯一来源。条目够多却一条根都不写，说明分组那一环没做。
     if ((v.rows || []).length >= 5) {
       const { sections } = parseLedger(text, ledgerFile);
-      const roots = (sections || []).filter((s) => /根|合并|独立/.test(s.title || '') && s.rows.length > 0);
+      // 一条都并不起来时，结论写在节标题上（`# 根：无可合并，N 条独立`）——账本的每一行都必须带「文件:行号」，
+      // 所以"没有根"这件事没有行可以承载，只能落在标题里。
+      const roots = (sections || []).filter(
+        (s) => /根|合并|独立/.test(s.title || '') && (s.rows.length > 0 || /可合并|独立/.test(s.title || '')),
+      );
       if (roots.length === 0) {
-        fail(`账本 ${ledgerFile} 没有「根」这一节（${v.rows.length} 条发现）：报告第 2 项会没有来源——一行一个根，写改哪一处、挂着哪几条、什么会推翻它；一条都并不起来就写一行"无可合并，N 条独立"`);
+        fail(`账本 ${ledgerFile} 没有「根」这一节（${v.rows.length} 条发现）：报告第 2 项会没有来源——一行一个根，写改哪一处、挂着哪几条、什么会推翻它；一条都并不起来就把结论写在节标题上（「# 根：无可合并，N 条独立」）`);
       } else {
-        notes.push(`根 ${roots.reduce((n, s) => n + s.rows.length, 0)} 条（${roots.map((s) => s.title).join('、')}）`);
+        const total = roots.reduce((n, s) => n + s.rows.length, 0);
+        notes.push(total === 0 ? `根：无可合并（${roots.map((s) => s.title).join('、')}）` : `根 ${total} 条（${roots.map((s) => s.title).join('、')}）`);
       }
     }
   }
