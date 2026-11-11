@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // 一次跑完全部机械检查：交付物的内容、账本、锚点、目录残留、分路覆盖。
 // 用法：
-//   node review-check.mjs <产出目录> [--root <对象根>] [--lanes <lanes.json>] [--json]
+//   node review-check.mjs <产出目录> [--root <对象根>] [--lanes <lanes.json>] [--scope <范围清单>] [--json]
 // 退出码：0 全部通过；1 有不通过项；2 用法或环境错误。
 //
 // 它不认报告的形状：没有段名、没有表也能过。内容项由 check-claims.mjs 判
@@ -13,11 +13,12 @@ import { scan as scanClaims } from './check-claims.mjs';
 import { validateFile, parseLedger } from './ledger.mjs';
 import { verify } from './verify-quotes.mjs';
 
-const USAGE = `用法：node review-check.mjs <产出目录> [--root <对象根>] [--lanes <lanes.json>] [--json]
+const USAGE = `用法：node review-check.mjs <产出目录> [--root <对象根>] [--lanes <lanes.json>] [--scope <范围清单>] [--json]
 
 产出目录里应当有一份交付物（报告或一段结论）；分过路或分过轮的评审，旁边还应当有一本合并后的账本，其余工作文件放在被审对象之外。
 --root 给了就同时核每条「文件:行号」锚点（文件在不在、行号越没越界）。
---lanes 给了就核分路覆盖：对象根下每个匹配扩展名的文件，至少被一路点名；同时要求交付目录里有账本。`;
+--lanes 给了就核分路覆盖：对象根下每个匹配扩展名的文件，至少被一路点名；同时要求交付目录里有账本。
+--scope 给了就核越界：报告与账本里的每个位置，要么在范围清单里，要么那一条自己标了「清单外」。它核的是标没标，核不了读了多少。分过路（--lanes）时必须给。`;
 
 // 账本：表头里有一列叫「位置」，正文基本就是这张表。不认列名、不认列数、不认顺序——
 // 曾经用一张固定列名的正则认账本，结果自由表头的账本被当成了第二份交付物。
@@ -39,7 +40,61 @@ function looksLikeLedger(name, text) {
 }
 const SKIP_DIRS = ['.git', 'node_modules', 'target', 'dist', '.release', 'vendor', '.next'];
 
-export function runCheck({ dir, root = null, lanesFile = null }) {
+// 范围清单：对象根下该看的文件一行一个，后面写"读了／未读／跳过（理由）"。
+// 只认每行第一个像路径的词，其余一律不管——它是工作文件，形状不该被脚本规定。
+// 这一节核的是"标没标"，不是"读了多少"：后者机械判不了，别在这里假装。
+const SCOPE_LABEL = /清单外|范围外|越界|未列入|不在清单/;
+const POS_RE = /[A-Za-z0-9_./\\:-]*\.[A-Za-z0-9]+:\d+/g;
+function parseScope(text) {
+  const out = [];
+  for (const raw of text.split(/\r?\n/)) {
+    let t = raw.trim();
+    if (!t || /^[#>|]/.test(t)) continue;
+    t = t.replace(/^[-*+]\s+/, '').replace(/`/g, '');
+    const m = t.match(/^([^\s（(),]+)/);
+    if (!m) continue;
+    const p = m[1].replace(/\\/g, '/').replace(/^\.\//, '');
+    if (!/\//.test(p) && !/\.[A-Za-z0-9]+$/.test(p)) continue;
+    if (/^\d+\.\d+/.test(p)) continue;
+    out.push(p);
+  }
+  return out;
+}
+function scopeMatch(pos, entries) {
+  const p = pos.replace(/\\/g, '/').replace(/^\.\//, '');
+  let best = null;
+  for (const e of entries) {
+    if (p === e || p.endsWith('/' + e) || e.endsWith('/' + p)) {
+      if (!best || e.length > best.length) best = e;
+    }
+  }
+  // 不按文件名兜底：两份同名文件（src/cmd/plan.rs 与 src/movepart/plan.rs）会被认成同一份，
+  // 于是越界的条目看着像在清单里。认不出就当清单外——宁可让作者把路径写全。
+  return best ? { how: 'path', entry: best } : null;
+}
+// 一个位置算不算"标了"，按它所在的那一块看：一段（空行隔开）、一个标题下、或表的一行。
+// 表不能整张算一块，否则表里任意一处写了"清单外"，全表都被兜住。
+function positionsWithBlocks(text) {
+  const lines = text.split(/\r?\n/);
+  const blockOf = (i) => {
+    if (lines[i].trim().startsWith('|')) return lines[i];
+    let a = i;
+    let b = i;
+    while (a > 0 && lines[a - 1].trim() !== '' && !lines[a - 1].trim().startsWith('#')) a--;
+    while (b + 1 < lines.length && lines[b + 1].trim() !== '' && !lines[b + 1].trim().startsWith('#')) b++;
+    return lines.slice(a, b + 1).join('\n');
+  };
+  const found = [];
+  lines.forEach((line, i) => {
+    for (const m of line.matchAll(POS_RE)) {
+      if (m[0].includes('://')) continue;
+      found.push({ pos: m[0], block: blockOf(i), line: i + 1 });
+    }
+  });
+  return found;
+}
+
+export function runCheck({ dir, root = null, lanesFile = null, scopeFile = null }) {
   const problems = [];
   const notes = [];
   const fail = (msg) => problems.push(msg);
@@ -127,6 +182,47 @@ export function runCheck({ dir, root = null, lanesFile = null }) {
     }
   }
 
+  // 4c. 越界：位置要么在范围清单里，要么那一条自己标了清单外
+  if (scopeFile) {
+    let entries = null;
+    try {
+      entries = parseScope(fs.readFileSync(scopeFile, 'utf8'));
+    } catch (e) {
+      return { ok: false, problems: [`读不了范围清单 ${scopeFile}：${e.message}`], notes };
+    }
+    if (entries.length === 0) {
+      fail(`范围清单 ${scopeFile} 里一个路径都没认出来——一行一个文件路径，后面写"读了／未读／跳过（理由）"`);
+    } else {
+      const targets = [];
+      if (reportFile) targets.push([reportFile, fs.readFileSync(path.join(dir, reportFile), 'utf8')]);
+      if (ledgerFile) targets.push([ledgerFile, fs.readFileSync(path.join(dir, ledgerFile), 'utf8')]);
+      const seen = new Set();
+      const unlabeled = [];
+      let inside = 0;
+      let labeled = 0;
+      for (const [, text] of targets) {
+        for (const { pos, block } of positionsWithBlocks(text)) {
+          if (seen.has(pos)) continue;
+          seen.add(pos);
+          const hit = scopeMatch(pos.replace(/:\d+$/, ''), entries);
+          if (hit) {
+            inside += 1;
+            continue;
+          }
+          if (SCOPE_LABEL.test(block)) labeled += 1;
+          else unlabeled.push(pos);
+        }
+      }
+      if (unlabeled.length) {
+        const shown = unlabeled.slice(0, 5).join('、');
+        fail(`${unlabeled.length} 处位置不在范围清单里，那一条也没标"清单外"：${shown}${unlabeled.length > 5 ? ' 等' : ''}——要么把它加进清单并说明原计划为什么没含它，要么在那一块里写明读到了什么程度、纳入范围与否交给读者定`);
+      }
+      notes.push(`范围清单 ${entries.length} 个文件 · 位置在清单内 ${inside} 处 · 清单外且已标 ${labeled} 处`);
+    }
+  } else if (lanesFile) {
+    fail('分过路却没给 --scope <范围清单>：越界这一项没法事后补——过程里要有一份"对象根下该看的文件一行一个"，报告与账本里的位置都按它核');
+  }
+
   // 5. 分路覆盖
   if (lanesFile) {
     if (!root) {
@@ -175,11 +271,13 @@ function main(argv) {
   let dir = null;
   let root = null;
   let lanesFile = null;
+  let scopeFile = null;
   let asJson = false;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--root') root = argv[++i];
     else if (a === '--lanes') lanesFile = argv[++i];
+    else if (a === '--scope') scopeFile = argv[++i];
     else if (a === '--json') asJson = true;
     else if (!dir) dir = a;
     else {
@@ -191,7 +289,7 @@ function main(argv) {
     console.error(USAGE);
     return 2;
   }
-  const r = runCheck({ dir, root, lanesFile });
+  const r = runCheck({ dir, root, lanesFile, scopeFile });
   if (asJson) {
     console.log(JSON.stringify(r, null, 2));
   } else {

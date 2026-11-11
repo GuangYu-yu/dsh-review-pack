@@ -23,7 +23,7 @@
 
    | 脚本 | 用法 | 它只核什么 |
    | --- | --- | --- |
-   | `review-check.mjs` | `<产出目录> [--root <对象根>] [--lanes <lanes.json>] [--json]` | 交付物与账本在不在、结构齐不齐 |
+   | `review-check.mjs` | `<产出目录> [--root <对象根>] [--lanes <lanes.json>] [--scope <范围清单>] [--json]` | 交付物与账本在不在、结构齐不齐、位置越没越界 |
    | `ledger.mjs` | `check <账本.md>` / `merge <输出.md> <账本.md>…` | 账本有没有「位置」列、编号连不连续 |
    | `verify-quotes.mjs` | `<报告.md 或 账本.md>… [--root <目录>] [--window 3] [--strict] [--json]` | `文件:行号` 在不在、越没越界；引文对不上只作提示 |
    | `check-claims.mjs` | `<文件.md>…` | 写了断言却给不出依据的句子 |
