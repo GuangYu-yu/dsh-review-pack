@@ -13,6 +13,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 // 只是一份示例表头（自测夹具与 `usage` 里给人看）。账本按自己的表头来：
 // 唯一的要求是有一列叫「位置」，其余列叫什么、有几列、顺不顺序都由你定。
@@ -231,64 +232,59 @@ export function mergeLedgers(inputs, { dedupe = true } = {}) {
   const seen = new Set();
   let n = 0;
 
-  // 合并后的表头：写的人用过的列名，按第一次出现的顺序；`#` 排在最前。
-  const order = [];
-  const remember = (name) => {
-    if (name !== '#' && !order.includes(name)) order.push(name);
-  };
-
+  // 每一段沿用它自己那本的表头，不取并集。取并集时 B 没有的列会被填成空格子，
+  // 而 check 对「有这一列却空着」是判失败的——合出来的东西过不了自己的检查。
+  // 来源本来就没这一列，不等于写的人留了空；两件事不能压成一种。
   for (const input of inputs) {
     const result = validateFile(input.text, input.file);
     problems.push(...result.problems);
     notes.push(...result.notes);
     const bySection = new Map();
     for (const row of result.rows) {
-      for (const c of row.columns) remember(c);
       const section = row.section || input.file;
-      if (!bySection.has(section)) bySection.set(section, []);
-      bySection.get(section).push(row);
+      if (!bySection.has(section)) bySection.set(section, { columns: row.columns, rows: [] });
+      bySection.get(section).rows.push(row);
     }
-    blocks.push({ file: input.file, sections: [...bySection] });
+    for (const [title, value] of bySection) {
+      blocks.push({ file: input.file, title, columns: value.columns, rows: value.rows });
+    }
   }
-
-  if (!order.includes(REQUIRED_COLUMN)) order.unshift(REQUIRED_COLUMN);
-  const header = ['#', ...order];
 
   const out = [];
   for (const block of blocks) {
-    for (const [title, list] of block.sections) {
-      const kept = [];
-      for (const row of list) {
-        const key = `${row.locPath}:${row.locFrom}|${row.value('问题') ?? ''}|${row.value('依据') ?? ''}`;
-        if (dedupe && seen.has(key)) {
-          notes.push({ file: row.file, line: row.line, msg: `合并时去掉一条重复：${row.locPath}:${row.locFrom}` });
-          continue;
-        }
-        seen.add(key);
-        n += 1;
-        kept.push({ row, n });
+    const header = ['#', ...block.columns.filter((c) => c !== '#')];
+    if (!header.includes(REQUIRED_COLUMN)) header.push(REQUIRED_COLUMN);
+    const kept = [];
+    for (const row of block.rows) {
+      const key = `${row.locPath}:${row.locFrom}|${row.value('问题') ?? ''}|${row.value('依据') ?? ''}`;
+      if (dedupe && seen.has(key)) {
+        notes.push({ file: row.file, line: row.line, msg: `合并时去掉一条重复：${row.locPath}:${row.locFrom}` });
+        continue;
       }
-      if (kept.length === 0) continue;
-      out.push(`# ${title}`);
-      out.push('');
-      out.push(`| ${header.join(' | ')} |`);
-      out.push(`|${header.map(() => '---').join('|')}|`);
-      // 段内编号从 1 起：合出来的每一段都要能被 check 原样接受。
-      let k = 0;
-      for (const { row } of kept) {
-        k += 1;
-        const no = k;
-        const cells = header.map((name) => {
-          if (name === '#') return String(no);
-          if (name === REQUIRED_COLUMN) {
-            return `\`${row.locPath}:${row.locFrom}${row.locTo !== row.locFrom ? `-${row.locTo}` : ''}\``;
-          }
-          return esc(row.value(name) ?? '');
-        });
-        out.push(`| ${cells.join(' | ')} |`);
-      }
-      out.push('');
+      seen.add(key);
+      n += 1;
+      kept.push({ row, n });
     }
+    if (kept.length === 0) continue;
+    out.push(`# ${block.title}`);
+    out.push('');
+    out.push(`| ${header.join(' | ')} |`);
+    out.push(`|${header.map(() => '---').join('|')}|`);
+    // 段内编号从 1 起：合出来的每一段都要能被 check 原样接受。
+    let k = 0;
+    for (const { row } of kept) {
+      k += 1;
+      const no = k;
+      const cells = header.map((name) => {
+        if (name === '#') return String(no);
+        if (name === REQUIRED_COLUMN) {
+          return `\`${row.locPath}:${row.locFrom}${row.locTo !== row.locFrom ? `-${row.locTo}` : ''}\``;
+        }
+        return esc(row.value(name) ?? '');
+      });
+      out.push(`| ${cells.join(' | ')} |`);
+    }
+    out.push('');
   }
 
   return { text: out.join('\n').trimEnd() + '\n', total: n, problems, notes };
@@ -377,8 +373,6 @@ function main(argv) {
   return 2;
 }
 
-const invoked = process.argv[1] !== undefined;
-const self = decodeURIComponent(new URL(import.meta.url).pathname).replace(/^\/([A-Za-z]:)/, '$1');
-if (invoked && path.resolve(process.argv[1]) === path.resolve(self)) {
+if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
   process.exitCode = main(process.argv);
 }

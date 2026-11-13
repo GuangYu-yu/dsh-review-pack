@@ -13,6 +13,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 const ANCHOR = /`?([A-Za-z0-9_./\\-]+\.[A-Za-z0-9]+):(\d+)(?:-(\d+))?`?/g;
 const BACKTICK = /`([^`\n]+)`/g;
@@ -384,8 +385,9 @@ function main(argv) {
   return failed === 0 ? 0 : 1;
 }
 
-if (process.argv[1] !== undefined) {
-  const self = path.resolve(process.argv[1]);
-  const here = path.resolve(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'));
-  if (self === here) process.exitCode = main(process.argv);
+// 入口只比一次绝对路径。别用 `new URL(import.meta.url).pathname`：那是没解码的路径，
+// 装进带空格或中文的目录后它永远比不相等，于是整个脚本不跑、退出码还是 0——
+// "没跑"与"跑过且没问题"就分不出来了。
+if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
+  process.exitCode = main(process.argv);
 }

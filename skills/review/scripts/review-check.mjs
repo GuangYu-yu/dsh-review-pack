@@ -9,6 +9,7 @@
 // 和"能不能对上源"。账本的形状也由主审定：只要有一张表、表头里有「位置」列。
 import fs from 'node:fs';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { scan as scanClaims } from './check-claims.mjs';
 import { validateFile, parseLedger } from './ledger.mjs';
 import { verify } from './verify-quotes.mjs';
@@ -537,6 +538,6 @@ function main(argv) {
   return r.ok ? 0 : 1;
 }
 
-if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith('review-check.mjs')) {
+if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
   process.exit(main(process.argv.slice(2)));
 }

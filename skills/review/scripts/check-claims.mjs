@@ -12,7 +12,9 @@ import { existsSync, readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
 const SLOT = /〈[^〉\n]{1,40}〉/;
-const APPROVAL = /能合|不能合|可以放行|建议合并|准予|批准/;
+// 只认"替读者宣布能合入"这一种说法。裸的「能合」会误伤报告里要求的
+// 「哪几条不能合并成一个根」——那是第 2 项的合法写法，不是裁决。
+const APPROVAL = /不能合入|(?<!不)能合(?!成)|可以放行|建议合并|准予|批准/;
 const COMPLETE = /没有遗漏|都查过了|全面覆盖|万无一失/;
 
 function mask(text) {
