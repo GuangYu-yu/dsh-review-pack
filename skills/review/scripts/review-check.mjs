@@ -14,7 +14,26 @@ import { scan as scanClaims } from './check-claims.mjs';
 import { validateFile, parseLedger } from './ledger.mjs';
 import { verify } from './verify-quotes.mjs';
 
+// 这一组是这台仪器对自己的清点：每一项都在下面代码里找得到对应的失败分支。
+// 它存在的理由只有一个——文档里那张"哪些有闸门、哪些只能读"的表，靠人维护就会漂。
+// check-pack 核这张清单与 skills/review/scripts/README.md 里 `checks:` 那一行是否集合相等。
+export const CHECKS = [
+  { id: 'dir', title: '产出目录：交付物唯一、分路账本已合并、分路时必须有账本' },
+  { id: 'deliverables', title: '交付物内容：未填槽位、替读者宣布通过、完整性命题' },
+  { id: 'ledger-table', title: '账本形状：列对齐、位置带锚点、编号连续、同位置不重复' },
+  { id: 'ledger-roots', title: '账本的「根」：有这一节、有「回扫」列、每行挂得上' },
+  { id: 'anchors', title: '锚点落得到源文件、行号不越界、引文在附近逐字存在' },
+  { id: 'decision-points', title: '位置够多时要写出「共用一个改动」或「互相独立」' },
+  { id: 'scope', title: '报告与账本里的位置都在范围清单内，或那一条自标清单外' },
+  { id: 'position-source', title: '报告里的位置在某一路账本里，否则写出相等的「回源 N 处」' },
+  { id: 'retracted-count', title: '「其余 N 条」的 N 与账本里没进报告的条数相等' },
+  { id: 'unread-blocks', title: '范围清单标了未读的，报告点名或写出相等的数' },
+  { id: 'lanes-coverage', title: '分路覆盖：对象根下每个匹配的文件至少有一路主责' },
+  { id: 'lane-scope', title: '派活只派范围清单内的文件' },
+];
+
 const USAGE = `用法：node review-check.mjs <产出目录> [--root <对象根>] [--lanes <lanes.json>] [--scope <范围清单>] [--json]
+       node review-check.mjs --list-checks
 
 产出目录里应当有一份交付物（报告或一段结论）；分过路或分过轮的评审，旁边还应当有一本合并后的账本，其余工作文件放在被审对象之外。
 --root 给了就同时核每条「文件:行号」锚点（文件在不在、行号越没越界）。
@@ -505,6 +524,11 @@ export function runCheck({ dir, root = null, lanesFile = null, scopeFile = null 
 }
 
 function main(argv) {
+  if (argv.includes('--list-checks')) {
+    for (const c of CHECKS) console.log(`${c.id}\t${c.title}`);
+    console.log(`review-check: ${CHECKS.length} 项（这份清单与 README 的 checks 行由 check-pack 核）`);
+    return 0;
+  }
   if (argv.length === 0 || argv.includes('-h') || argv.includes('--help')) {
     console.log(USAGE);
     return argv.length === 0 ? 2 : 0;
