@@ -19,7 +19,7 @@ const USAGE = `用法：node review-check.mjs <产出目录> [--root <对象根>
 产出目录里应当有一份交付物（报告或一段结论）；分过路或分过轮的评审，旁边还应当有一本合并后的账本，其余工作文件放在被审对象之外。
 --root 给了就同时核每条「文件:行号」锚点（文件在不在、行号越没越界）。
 --lanes 给了就核分路覆盖：对象根下每个匹配扩展名的文件，至少被一路点名；同时要求交付目录里有账本。
---lanes 还核「位置从哪来」：报告里的每个位置，要么出现在某一路交回的账本里，要么报告里写出「主审回源 N 处」、N 等于实际对不上的数目。全部来自分路账本时这一行可以没有。
+--lanes 还核「位置从哪来」：报告里的每个位置，要么出现在某一路交回的账本里，要么报告里写出「回源 N 处」、N 等于实际对不上的数目。全部来自分路账本时这一行可以没有。
 --lanes 核派活范围：分路清单里派出去的文件必须在范围清单内——清单先写、派活只派清单内的。
 --scope 给了就核越界：报告与账本里（含分路账本）的每个位置，要么在范围清单里，要么那一条自己标了「清单外」。它核的是标没标，核不了读了多少。分过路（--lanes）时必须给。
 --scope 还核覆盖：清单里标了未读／跳过的文件，报告里要么逐个点名，要么写出一个与实际相等的数。
@@ -378,11 +378,11 @@ export function runCheck({ dir, root = null, lanesFile = null, scopeFile = null 
         const DECL = /(?:回源|一手核|亲自核)[^\d\n]{0,15}(\d+)\s*处|只在报告里[^\d\n]{0,15}(\d+)\s*处/g;
         const declared = [...reportText.matchAll(DECL)].map((m) => Number(m[1] ?? m[2]));
         if (declared.length === 0) {
-          fail(`${orphans.length} 处位置不在任何一路的账本里：${shown}${orphans.length > 5 ? ' 等' : ''}——报告里要有一行「主审回源 N 处」，N 等于实际数；要么把它们补进某一路的账本。这一行的数一变大，就说明窗口在自己读，路由编制没成立`);
+          fail(`${orphans.length} 处位置不在任何一路的账本里：${shown}${orphans.length > 5 ? ' 等' : ''}——报告里要有一行「回源 N 处」，N 等于实际数；要么把它们补进某一路的账本。这一行的数一变大，就说明窗口在自己读，路由编制没成立`);
         } else if (!declared.includes(orphans.length)) {
           fail(`报告写的是回源 ${declared.join('、')} 处，实际对不上的是 ${orphans.length} 处（${shown}${orphans.length > 5 ? ' 等' : ''}）——数对不上，等于没有交代`);
         } else {
-          notes.push(`位置来源：分路账本 ${lanePos.size} 处 · 报告 ${reportPos.size} 处 · 主审自核 ${orphans.length} 处（已声明）`);
+          notes.push(`位置来源：分路账本 ${lanePos.size} 处 · 报告 ${reportPos.size} 处 · 窗口自核 ${orphans.length} 处（已声明）`);
         }
       }
     }
