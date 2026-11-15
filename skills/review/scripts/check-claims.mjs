@@ -2,9 +2,10 @@
 /**
  * 自由形态的语义检查：不认段名、不认表、不认块序、不认词表。
  *
- * 只核两件能判真假的事：
+ * 只核三件能判真假的事：
  *   1. 有没有没填的槽位（〈…〉）——模板不是交付物；
- *   2. 有没有替读者宣布通过、或声称"没有遗漏"这类完整性命题。
+ *   2. 有没有替读者宣布通过、或声称"没有遗漏"这类完整性命题；
+ *   3. 有没有不可见或双向控制字符——它让人读到的字序与字节不同，抄下去会继续传播。
  *
  * 用法：node check-claims.mjs <文件.md> [<文件.md> ...]
  */
@@ -14,8 +15,10 @@ import { pathToFileURL } from 'node:url';
 const SLOT = /〈[^〉\n]{1,40}〉/;
 // 只认"替读者宣布能合入"这一种说法。裸的「能合」会误伤报告里要求的
 // 「哪几条不能合并成一个根」——那是第 2 项的合法写法，不是裁决。
-const APPROVAL = /不能合入|(?<!不)能合(?!成)|可以放行|建议合并|准予|批准/;
+const APPROVAL = /不能合入|(?<!不)能合(?!成)|(?<!不)可以合[并入]|可以放行|建议合并|准予|批准/;
 const COMPLETE = /没有遗漏|都查过了|全面覆盖|万无一失/;
+// 零宽、双向控制、字节序标记：显示与字节不一致，肉眼看不见。
+const INVISIBLE = /[\u200B-\u200F\u202A-\u202E\u2060-\u2064\u2066-\u2069\uFEFF]/;
 
 function mask(text) {
   const lines = text.split('\n');
@@ -24,6 +27,10 @@ function mask(text) {
     if (/^\s*(```|~~~)/.test(l)) { fence = !fence; return ''; }
     return fence ? '' : l;
   });
+}
+
+function codePoint(ch) {
+  return "U+" + (0x10000 + ch.codePointAt(0)).toString(16).slice(1).toUpperCase();
 }
 
 export function scan(text) {
@@ -39,6 +46,15 @@ export function scan(text) {
     if (APPROVAL.test(line)) problems.push(at('出现了审批词——直接说事，不说"能合／放行"'));
     if (COMPLETE.test(line)) problems.push(at('出现了完整性命题——只能说"在覆盖表内未发现"'));
   });
+
+  // 不可见字符扫原文：代码围栏里也不放过。
+  text.split("\n").forEach((raw, i) => {
+    const hits = [...raw].filter((ch) => INVISIBLE.test(ch));
+    if (hits.length === 0) return;
+    const points = [...new Set(hits)].map(codePoint);
+    problems.push("第 " + (i + 1) + " 行 出现不可见或控制字符 " + points.join("、") + "（" + hits.length + " 个）——它能让显示的次序与字节不同；要引用就写转义形式，别原样留着");
+  });
+
   return problems;
 }
 
