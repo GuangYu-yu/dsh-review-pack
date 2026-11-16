@@ -203,6 +203,7 @@ export function runCheck({ dir, root = null, lanesFile = null, scopeFile = null 
     .filter((d) => d.isFile())
     .map((d) => d.name)
     .filter((f) => f.toLowerCase().endsWith('.md'))
+    .filter((f) => f.toLowerCase() !== 'run-record.md')
     .sort();
   const deliverables = [];
   let ledgerFile = null;
