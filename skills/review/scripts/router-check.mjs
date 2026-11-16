@@ -55,7 +55,7 @@ function cleanHeader(cell) {
 }
 
 // 从任意 markdown 里取出第一张表：表头行 + 数据行。找不到返回 null。
-function parseTable(text) {
+export function parseTable(text) {
   const lines = text.split(/\r?\n/);
   for (let i = 0; i + 1 < lines.length; i++) {
     if (!lines[i].trim().startsWith('|') || !SEPARATOR.test(lines[i + 1].trim())) continue;
@@ -87,12 +87,12 @@ function requireColumns(table, required, label, problems) {
   return true;
 }
 
-function cellOf(row, header, name) {
+export function cellOf(row, header, name) {
   const i = header.indexOf(name);
   return i < 0 ? '' : (row[i] ?? '').trim();
 }
 
-function sha256File(file) {
+export function sha256File(file) {
   return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 }
 
