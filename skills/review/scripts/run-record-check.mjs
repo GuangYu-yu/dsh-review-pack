@@ -99,7 +99,7 @@ export function checkRecord(dir) {
       if (!script) continue;
       if (/未记日志\s*[:：]\s*\S/.test(it)) continue;
       const ex = it.match(/(?:exit|退出码)\s*[:：=]?\s*(\d+)/i);
-      claimed.push({ script, exit: ex ? Number(ex[1]) : null });
+      claimed.push({ script, exit: ex ? Number(ex[1]) : null, line: it });
     }
     if (claimed.length) {
       // 只看这两个位置：显式设了的 $REVIEW_RUN_LOG，和交付目录里那份。不猜 cwd——
@@ -120,7 +120,19 @@ export function checkRecord(dir) {
           if (hit < 0) {
             problems.push('仪器节说跑了 ' + c.script + (c.exit === null ? '' : '（exit: ' + c.exit + '）')
               + '，日志里没有对应的一行——跳过没跑的话，这一行是事后补的');
-          } else used.add(hit);
+          } else {
+            used.add(hit);
+            // 命令行原文也要对得上：档案里手写的参数，得真出现在那一次调用的 argv 里。
+            // 只比脚本名与退出码的话，写一份"跑过 check-claims 但参数完全不同"的档案照样过。
+            const argvText = (rows[hit] && rows[hit].argv ? rows[hit].argv : []).join(' ');
+            const tokens = (c.line.match(/[\w一-龥./-]+\.(?:md|json|txt|mjs|ya?ml)/g) || [])
+              .filter((t) => !t.includes(c.script));
+            const missing = tokens.filter((t) => !argvText.includes(t) && !argvText.includes(path.basename(t)));
+            if (missing.length) {
+              problems.push('仪器行写的参数在日志里找不到：' + missing.join('、')
+                + '（日志里那一次是 ' + (argvText || '（无参数）') + '）——命令行原文要与真跑的那次一致');
+            }
+          }
         }
       }
     }

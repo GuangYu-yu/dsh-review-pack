@@ -31,6 +31,9 @@ export const CHECKS = [
   { id: 'unread-blocks', title: '范围清单标了未读的，报告点名或写出相等的数' },
   { id: 'lanes-coverage', title: '分路覆盖：对象根下每个匹配的文件至少有一路主责' },
   { id: 'lane-scope', title: '派活只派范围清单内的文件' },
+  { id: 'report-fields', title: '报告首行有编制三样' },
+  { id: 'counts', title: '读全 k/n 与归纳数对得上账本与范围清单' },
+  { id: 'escalation', title: '报告写了不可逆、加载节就要列对抗与验证两册' },
 ];
 
 const USAGE = `用法：node review-check.mjs <产出目录> [--root <对象根>] [--lanes <lanes.json>] [--scope <范围清单>] [--json]
@@ -300,6 +303,29 @@ export function runCheck({ dir, root = null, lanesFile = null, scopeFile = null 
     }
   }
 
+  // 3b. 升级：报告写了「不可逆：会」，加载节就得列对抗与验证两册。
+  // 这是跨两件产物的集合包含——单看报告判不了它有没有按后果升级，
+  // 单看执行档案也判不了它为什么该升级。两者都在，判据才成立。
+  if (reportFile) {
+    const rep = fs.readFileSync(path.join(dir, reportFile), 'utf8');
+    if (/不可逆\s*[:：]\s*会/.test(rep)) {
+      const rr = path.join(dir, 'run-record.md');
+      if (!fs.existsSync(rr)) {
+        notes.push('升级：报告写了「不可逆：会」，但交付目录里没有执行档案，加载节无从核对');
+      } else {
+        // 按标题切块取出「加载」那一节：用 $ 做终止会停在每一行行尾（multiline 下 $ 匹配行末），
+        // 结果只拿到标题本身——那样这一项永远红。
+        const sec = fs
+          .readFileSync(rr, 'utf8')
+          .split(/^#{1,6}\s+/m)
+          .find((s) => s.startsWith('加载')) || '';
+        for (const must of ['adversarial', 'verification']) {
+          if (!sec.includes(must)) fail(`升级：报告写了「不可逆：会」，加载节却没列 ${must}——按后果升级不是可选项`);
+        }
+      }
+    }
+  }
+
   // 4. 锚点：报告与账本都要核。
   // 只核报告时，账本里一个越界的行号没有任何闸门看得见——而账本是发现表本身，
   // 上面的位置还要被"根"和"回源"再引一遍，错了比报告里错更贵。
@@ -317,6 +343,12 @@ export function runCheck({ dir, root = null, lanesFile = null, scopeFile = null 
     for (const [label, p] of targets) {
       const q = verify(fs.readFileSync(p, 'utf8'), { file: label, root: path.resolve(root) });
       for (const item of q.problems) fail(`锚点 ${label}：${item.msg || item.code}`);
+      // 引文侧：verify-quotes 把它们放进 advisories（CLI 要 --strict 才红），
+      // 而闸门表写的是"引文在附近逐字存在"。不在这里转成失败，
+      // 伪造的引文在最常用的调用路径上就是绿的。
+      for (const item of q.advisories) {
+        if (item.code === 'QUOTE_NOT_FOUND' || item.code === 'QUOTE_ELSEWHERE') fail(`锚点 ${label}：${item.msg || item.code}`);
+      }
       for (const item of q.notes) notes.push(`锚点 ${label}：${item.msg || ''}`);
       anchorsChecked += q.anchorsChecked;
       quotesChecked += q.quotesChecked;
@@ -333,6 +365,48 @@ export function runCheck({ dir, root = null, lanesFile = null, scopeFile = null 
     const declared = /根因|共同根|可合并|互相独立|各自独立|彼此独立|只有散条|综合没做/.test(text);
     if (anchors >= 4 && !declared) {
       fail(`交付物 ${reportFile} 有 ${anchors} 处位置，却没有"哪些条会被同一个改动一起消掉"的结论，也没写"互相独立"——第 2 项空着要写成结论，沉默读者分不清是判过还是没走到`);
+    }
+  }
+
+  // 4b2. 报告首行的「编制」三样（正文谁写／裁决谁做／一手核几处）。
+  // 核存在性与三样在不在同一行；写得对不对仍是读。
+  if (reportFile) {
+    const head = fs.readFileSync(path.join(dir, reportFile), 'utf8').split(/\r?\n/).slice(0, 4).join('\n');
+    if (!/编制/.test(head)) {
+      fail('交付物 ' + reportFile + ' 的前四行里没有「编制」——正文谁写、裁决谁做、你自己一手核了几处，这三样要在报告第一行；缺了读者不知道这是谁的结论');
+    } else {
+      const want = ['正文', '裁决', '一手核'];
+      const missing = want.filter((w) => !head.includes(w));
+      if (missing.length) fail('交付物 ' + reportFile + ' 的「编制」行缺了：' + missing.join('、') + '——三样各是一个位置上的事实，缺一样读者就得自己猜');
+      else notes.push('编制三样都在报告首行');
+    }
+  }
+
+  // 4b3. 两个数：「读全 k/n」与「归纳基于 N 条，账本共 M 条」。
+  // 只判数相等（n 对范围清单、M 对账本行数、k≤n、N≤M）；写得对不对仍是读。
+  if (reportFile) {
+    const text = fs.readFileSync(path.join(dir, reportFile), 'utf8');
+    const kn = text.match(/读全\s*(\d+)\s*\/\s*(\d+)/);
+    const sum = text.match(/归纳基于\s*(\d+)\s*条[，,]\s*账本共\s*(\d+)\s*条/);
+    const ledgerRows = ledgerFile
+      ? (validateFile(fs.readFileSync(path.join(dir, ledgerFile), 'utf8'), ledgerFile).rows || []).length
+      : 0;
+    const scopeCount = scopeFile ? parseScopeDetailed(fs.readFileSync(scopeFile, 'utf8')).length : null;
+    if (kn) {
+      const k = Number(kn[1]);
+      const n = Number(kn[2]);
+      if (k > n) fail('交付物 ' + reportFile + ' 写「读全 ' + k + '/' + n + '」：读全的比总数还多');
+      else if (scopeCount !== null && n !== scopeCount) fail('交付物 ' + reportFile + ' 写「读全 ' + k + '/' + n + '」，范围清单里是 ' + scopeCount + ' 个文件——分母对不上，读者会按你写的那个数估覆盖率');
+      else notes.push('读全 ' + k + '/' + n + '（与范围清单对得上）');
+    } else if (scopeCount) {
+      fail('交付物 ' + reportFile + ' 没写「读全 k/n」——范围清单有 ' + scopeCount + ' 个文件，不写这个数，读者无法判断读了多少');
+    }
+    if (sum) {
+      const N = Number(sum[1]);
+      const M = Number(sum[2]);
+      if (ledgerFile && M !== ledgerRows) fail('交付物 ' + reportFile + ' 写「账本共 ' + M + ' 条」，账本里是 ' + ledgerRows + ' 条——数对不上');
+      else if (N > M) fail('交付物 ' + reportFile + ' 写「归纳基于 ' + N + ' 条」，比账本总数 ' + M + ' 还多');
+      else notes.push('归纳基于 ' + N + ' 条，账本共 ' + M + ' 条（对得上）');
     }
   }
 
