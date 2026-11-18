@@ -20,6 +20,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { pathToFileURL } from 'node:url';
+import { installRunLog } from './run-log.mjs';
 
 export const MANIFEST_COLUMNS = ['id', '派活单', 'sha256', '账本'];
 export const TRANSFER_COLUMNS = ['id', '账本', '状态'];
@@ -241,5 +242,6 @@ function main(argv) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
+  installRunLog('router-check.mjs');
   main(process.argv.slice(2));
 }

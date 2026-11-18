@@ -14,6 +14,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { installRunLog } from './run-log.mjs';
 
 // 只是一份示例表头（自测夹具与 `usage` 里给人看）。账本按自己的表头来：
 // 唯一的要求是有一列叫「位置」，其余列叫什么、有几列、顺不顺序都由你定。
@@ -374,5 +375,6 @@ function main(argv) {
 }
 
 if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
+  installRunLog('ledger.mjs');
   process.exitCode = main(process.argv);
 }

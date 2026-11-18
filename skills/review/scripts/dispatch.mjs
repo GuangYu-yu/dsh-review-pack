@@ -16,6 +16,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { checkRouter, MANIFEST_COLUMNS, parseTable, cellOf, sha256File } from './router-check.mjs';
+import { installRunLog } from './run-log.mjs';
 
 const SHA = /^[0-9a-f]{64}$/;
 
@@ -104,5 +105,6 @@ function main(argv) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
+  installRunLog('dispatch.mjs');
   main(process.argv.slice(2));
 }

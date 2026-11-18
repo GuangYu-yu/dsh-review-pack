@@ -3,6 +3,7 @@
 // 它只回答「哪几句没了、哪几句新增、哪几句被改了」，判断要人做。
 import fs from 'node:fs';
 import path from 'node:path';
+import { installRunLog } from './run-log.mjs';
 
 const norm = (s) => s.replace(/[\s*_·>|]/g, '').trim();
 const split = (t) => t.split(/\n/).flatMap((line) =>
@@ -51,6 +52,7 @@ export function diffTrees(oldDir, newDir, threshold = 0.55) {
 }
 
 if (process.argv[1] && import.meta.url === new URL('file://' + process.argv[1].replace(/\\/g, '/')).href) {
+  installRunLog('semantic-diff.mjs');
   const [oldDir, newDir] = process.argv.slice(2);
   if (!oldDir || !newDir) { console.log('用法：node scripts/semantic-diff.mjs <旧目录> <新目录> [--full]'); process.exit(2); }
   const full = process.argv.includes('--full');

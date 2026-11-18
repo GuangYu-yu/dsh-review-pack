@@ -11,6 +11,7 @@
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
+import { installRunLog } from './run-log.mjs';
 
 const SLOT = /〈[^〉\n]{1,40}〉/;
 // 只认"替读者宣布能合入"这一种说法。裸的「能合」会误伤报告里要求的
@@ -59,6 +60,7 @@ export function scan(text) {
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+  installRunLog('check-claims.mjs');
   const files = process.argv.slice(2).filter((a) => !a.startsWith('--'));
   if (files.length === 0) { console.error('用法：node check-claims.mjs <文件.md> [...]'); process.exit(2); }
   let bad = 0;

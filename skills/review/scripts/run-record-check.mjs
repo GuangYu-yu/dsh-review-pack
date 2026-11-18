@@ -1,20 +1,30 @@
 #!/usr/bin/env node
 // 核执行档案（run-record.md）的形状。它不判结论对错，也不判档案真假——
 // 它判的是：这份档案有没有把「当时跑没跑」写成能被第二个人对上的形状。
+//
+// 仪器那一节多核一件事：档案里说跑过的脚本，得在 run-log.jsonl 里有对应的一行。
+// 日志是脚本自己写的，档案是手写的——对不上，说明这一行不是那次调用留下的。
+// 它仍核不了「日志是不是整份伪造的」：那要宿主层管（见 .debug-session/LIMITS.md 的 L3）。
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { installRunLog, readRunLog, verifyChain } from './run-log.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const SKILL_ROOT = path.resolve(HERE, '..');              // …/skills/review
 const RECORD = 'run-record.md';
 
 const SECTIONS = ['加载', '仪器', '编制', '自评', '缺口'];
+// 会自己写日志的那几个脚本：仪器行点到它们，才要求日志里有对应的一行。
+const LOGGED = ['check-claims.mjs', 'dispatch.mjs', 'ledger.mjs', 'review-check.mjs',
+  'router-check.mjs', 'run-record-check.mjs', 'semantic-diff.mjs', 'verify-quotes.mjs'];
 const USAGE = [
   '用法：node scripts/run-record-check.mjs <交付目录>',
   '',
   '它核五节在不在、加载的册能不能逐个对上、仪器有没有命令行与退出码、',
   '未跑有没有写原因、自评的 M 是不是大于 N、缺口有没有写成「未取得 → 因此不能确认」。',
+  '仪器行点到本技能自己的脚本时，还要在 <交付目录>/run-log.jsonl（或 $REVIEW_RUN_LOG）里',
+  '找到对应的一行，且那份日志的哈希链是完整的。',
   '它核不了「报告里说的和档案里写的是同一件事」——那要人对着读。',
 ].join('\n');
 
@@ -80,6 +90,40 @@ export function checkRecord(dir) {
         if (!cands.some((p) => fs.existsSync(p))) problems.push('仪器行点到的文件不存在（删掉它，这一行就没有证据）：' + f);
       }
     }
+
+    // 日志对账：脚本自己写的那一行，手写的档案对不上它就是事后补的。
+    const claimed = [];
+    for (const it of items) {
+      if (/未跑\s*[:：]/.test(it)) continue;
+      const script = LOGGED.find((n) => it.includes(n));
+      if (!script) continue;
+      if (/未记日志\s*[:：]\s*\S/.test(it)) continue;
+      const ex = it.match(/(?:exit|退出码)\s*[:：=]?\s*(\d+)/i);
+      claimed.push({ script, exit: ex ? Number(ex[1]) : null });
+    }
+    if (claimed.length) {
+      // 只看这两个位置：显式设了的 $REVIEW_RUN_LOG，和交付目录里那份。不猜 cwd——
+      // 猜错会把上一轮评审的日志当成这一轮的证据。
+      const logFile = [process.env.REVIEW_RUN_LOG, path.join(dir, 'run-log.jsonl')].find((p) => p && fs.existsSync(p)) || null;
+      const lines = logFile ? readRunLog(logFile) : null;
+      if (lines === null) {
+        for (const c of claimed) {
+          problems.push('仪器节说跑了 ' + c.script + '，却没找到 run-log（评审开始时设 REVIEW_RUN_LOG=<交付目录>/run-log.jsonl）；'
+            + '这一轮确实没留日志，就在这一行写「未记日志：〈原因〉」');
+        }
+      } else {
+        for (const b of verifyChain(lines)) problems.push('日志 ' + path.basename(logFile) + ' 第 ' + b.at + ' 行：' + b.why);
+        const rows = lines.map((raw) => { try { return JSON.parse(raw); } catch { return null; } });
+        const used = new Set();
+        for (const c of claimed) {
+          const hit = rows.findIndex((r, i) => r && !used.has(i) && r.script === c.script && (c.exit === null || r.exit === c.exit));
+          if (hit < 0) {
+            problems.push('仪器节说跑了 ' + c.script + (c.exit === null ? '' : '（exit: ' + c.exit + '）')
+              + '，日志里没有对应的一行——跳过没跑的话，这一行是事后补的');
+          } else used.add(hit);
+        }
+      }
+    }
   }
 
   if (got['编制']) {
@@ -115,6 +159,7 @@ export function checkRecord(dir) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
+  installRunLog('run-record-check.mjs');
   const dir = process.argv[2];
   if (!dir) { console.log(USAGE); process.exit(2); }
   const r = checkRecord(dir);

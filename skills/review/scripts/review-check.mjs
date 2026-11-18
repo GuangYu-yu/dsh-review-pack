@@ -13,6 +13,7 @@ import { pathToFileURL } from 'node:url';
 import { scan as scanClaims } from './check-claims.mjs';
 import { validateFile, parseLedger } from './ledger.mjs';
 import { verify } from './verify-quotes.mjs';
+import { installRunLog } from './run-log.mjs';
 
 // 这一组是这台仪器对自己的清点：每一项都在下面代码里找得到对应的失败分支。
 // 它存在的理由只有一个——文档里那张"哪些有闸门、哪些只能读"的表，靠人维护就会漂。
@@ -36,7 +37,7 @@ const USAGE = `用法：node review-check.mjs <产出目录> [--root <对象根>
        node review-check.mjs --list-checks
 
 产出目录里应当有一份交付物（报告或一段结论）；分过路或分过轮的评审，旁边还应当有一本合并后的账本，其余工作文件放在被审对象之外。
---root 给了就同时核每条「文件:行号」锚点（文件在不在、行号越没越界）。
+--root 给了就同时核报告与账本里每条「文件:行号」锚点（文件在不在、行号越没越界）。账本里的位置还要被「根」和「回源」再引一遍，错了比报告里错更贵。
 --lanes 给了就核分路覆盖：对象根下每个匹配扩展名的文件，至少被一路点名；同时要求交付目录里有账本。
 --lanes 还核「位置从哪来」：报告里的每个位置，要么出现在某一路交回的账本里，要么报告里写出「回源 N 处」、N 等于实际对不上的数目。全部来自分路账本时这一行可以没有。按接口当窗口的编制下这个数只能是零；主审自核的照实写数目。
 --lanes 核派活范围：分路清单里派出去的文件必须在范围清单内——清单先写、派活只派清单内的。
@@ -299,13 +300,30 @@ export function runCheck({ dir, root = null, lanesFile = null, scopeFile = null 
     }
   }
 
-  // 4. 锚点
-  if (reportFile && root) {
-    const p = path.join(dir, reportFile);
-    const q = verify(fs.readFileSync(p, 'utf8'), { file: reportFile, root: path.resolve(root) });
-    if (q.anchorsChecked === 0) notes.push('锚点 0 处：交付物里没有任何 `文件:行号`，这一项没有可核的');
-    for (const item of q.problems) fail(`锚点 ${item.msg || item.code}`);
-    notes.push(`锚点 ${q.anchorsChecked} 处 · 引文 ${q.quotesChecked} 条 · 提示 ${q.advisories.length} 项`);
+  // 4. 锚点：报告与账本都要核。
+  // 只核报告时，账本里一个越界的行号没有任何闸门看得见——而账本是发现表本身，
+  // 上面的位置还要被"根"和"回源"再引一遍，错了比报告里错更贵。
+  if (root) {
+    const targets = [];
+    if (reportFile) targets.push([reportFile, path.join(dir, reportFile)]);
+    if (ledgerFile) targets.push([ledgerFile, path.join(dir, ledgerFile)]);
+    // 分路账本也核：只核合并后的账本，越界行在合并时被删掉就查不出来。
+    for (const l of lanesFile ? laneLedgers(lanesFile) : []) {
+      if (l.exists) targets.push([`分路账本 ${l.name}`, l.path]);
+    }
+    let anchorsChecked = 0;
+    let quotesChecked = 0;
+    let advisories = 0;
+    for (const [label, p] of targets) {
+      const q = verify(fs.readFileSync(p, 'utf8'), { file: label, root: path.resolve(root) });
+      for (const item of q.problems) fail(`锚点 ${label}：${item.msg || item.code}`);
+      for (const item of q.notes) notes.push(`锚点 ${label}：${item.msg || ''}`);
+      anchorsChecked += q.anchorsChecked;
+      quotesChecked += q.quotesChecked;
+      advisories += q.advisories.length;
+    }
+    if (anchorsChecked === 0) notes.push('锚点 0 处：交付物与账本里没有任何 `文件:行号`，这一项没有可核的');
+    else notes.push(`锚点 ${anchorsChecked} 处 · 引文 ${quotesChecked} 条 · 提示 ${advisories} 项`);
   }
 
   // 4b. 第 2 项：发现了若干条，却没写"哪些条共用一个改动"（或没写它们互相独立）
@@ -570,5 +588,6 @@ function main(argv) {
 }
 
 if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
+  installRunLog('review-check.mjs');
   process.exit(main(process.argv.slice(2)));
 }

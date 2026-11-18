@@ -14,6 +14,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { installRunLog } from './run-log.mjs';
 
 const ANCHOR = /`?([A-Za-z0-9_./\\-]+\.[A-Za-z0-9]+):(\d+)(?:-(\d+))?`?/g;
 const BACKTICK = /`([^`\n]+)`/g;
@@ -389,5 +390,6 @@ function main(argv) {
 // 装进带空格或中文的目录后它永远比不相等，于是整个脚本不跑、退出码还是 0——
 // "没跑"与"跑过且没问题"就分不出来了。
 if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
+  installRunLog('verify-quotes.mjs');
   process.exitCode = main(process.argv);
 }
